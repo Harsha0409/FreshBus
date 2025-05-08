@@ -1,0 +1,781 @@
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useAuth } from './hooks/useAuth';
+import { Moon, Sun } from 'lucide-react';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { Sidebar } from './components/Sidebar';
+import { ChatMessage } from './components/ChatMessage';
+import ChatInput from './components/ChatInput';
+import { Chat, Message, } from './types'; // Import all needed types
+import { Logo } from './components/Logo';
+import LoginModal from './components/LoginModal';
+import { LoginModalProvider, useLoginModal } from './context/loginModalContext';
+import { ToastContainer, toast } from 'react-toastify';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import 'react-toastify/dist/ReactToastify.css';
+import { Toaster } from 'react-hot-toast';
+import { authService } from './services/api'; // Import authService for logout functionality
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import PaymentCallback from './components/PaymentCallback'; // Import your payment callback component
+
+
+
+
+
+
+const mockChats: Chat[] = [
+    {
+        id: '1',
+        title: 'Getting Started',
+        lastUpdated: new Date(),
+        messages: [],
+    },
+];
+
+function Layout({chats, setChats}: {chats: Chat[], setChats: React.Dispatch<React.SetStateAction<Chat[]>>}) {
+    const { theme, toggleTheme } = useTheme();
+    const { onOpen } = useLoginModal();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [selectedChatId, setSelectedChatId] = useState<string>('1');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const isAuthenticated = useAuth();
+    const [showLogout, setShowLogout] = useState(false);
+    // const [isChatStarted, setIsChatStarted] = useState(false); // Track if chat has started
+
+    // Add these near the top of your Layout component
+    const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>();
+    const { sessionId } = useParams();
+
+useEffect(() => {
+  if (sessionId) setSelectedChatId(sessionId);
+}, [sessionId]);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // New function to create a session
+    const createNewSession = useCallback(() => {
+        const newChat: Chat = {
+            id: Date.now().toString(),
+            title: 'New Chat',
+            messages: [],
+            lastUpdated: new Date(),
+        };
+        
+        setChats(prevChats => [newChat, ...prevChats]);
+        setSelectedChatId(newChat.id);
+        localStorage.setItem('sessionId', newChat.id);
+        
+        // Navigate to the new session URL
+        navigate(`/c/${newChat.id}`);
+        
+        return newChat.id;
+    }, [navigate]);
+
+    // Add booking state and handler
+    // const [isBookingLoading, setIsBookingLoading] = useState(false);
+
+    // const handleBookingProcess = useCallback(async (callback: () => Promise<any>) => {
+    //     setIsBookingLoading(true);
+    //     try {
+    //         await callback();
+    //         toast.success('Booking successful!');
+    //     } catch (error: any) {
+    //         console.error('Booking error:', error);
+    //         toast.error(error.message || 'An error occurred during booking');
+    //     } finally {
+    //         setIsBookingLoading(false);
+    //     }
+    // }, []);
+
+    // Keep existing handlers
+    // Inside Layout component in App.tsx
+    // Inside Layout component in App.tsx, modify the useEffect that handles payment status:
+
+    useEffect(() => {
+        const paymentData = localStorage.getItem('paymentStatus');
+        if (
+          paymentData &&
+          selectedChatId &&
+          chats.some(chat => chat.id === selectedChatId)
+        ) {
+          try {
+            const { sessionId, summary } = JSON.parse(paymentData);
+            if (selectedChatId === sessionId && summary) {
+              // First update the local chat state
+              setChats(prevChats =>
+                prevChats.map(chat =>
+                  chat.id === sessionId
+                    ? {
+                        ...chat,
+                        messages: [
+                          ...chat.messages,
+                          {
+                            id: Date.now().toString(),
+                            role: 'assistant',
+                            content: summary,
+                            timestamp: new Date(),
+                          },
+                        ],
+                        lastUpdated: new Date(),
+                      }
+                    : chat
+                )
+              );
+              
+              // Then store in Redis
+              const userStr = localStorage.getItem('user');
+              let user = userStr && userStr !== "undefined" ? JSON.parse(userStr) : {};
+              
+              if (user.id && user.mobile) {
+                // Use the new endpoint to store payment message
+                fetch('/api/payment/message', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    user_id: Number(user.id),
+                    session_id: sessionId,
+                    summary: summary,
+                    name: user.name || null,
+                    mobile: user.mobile
+                  })
+                }).catch(err => {
+                  console.error("Failed to save payment confirmation to Redis:", err);
+                });
+              }
+              
+              localStorage.removeItem('paymentStatus');
+            }
+          } catch (error) {
+            console.error("Error processing payment status:", error);
+          }
+        }
+      }, [selectedChatId, chats, setChats]);
+
+    const toggleSidebar = useCallback(() => {
+        setIsSidebarOpen(prev => !prev);
+    }, []);
+
+
+    const handleSendMessage = useCallback(async (content: string) => {
+        const userStr = localStorage.getItem('user');
+        let user: { id?: string; name?: string; mobile?: string } = {};
+        try {
+            user = userStr && userStr !== "undefined" ? JSON.parse(userStr) : {};
+        } catch {
+            user = {};
+        }
+        if (!user.id || !user.mobile) {
+            toast.error("Please login to chat.");
+            return;
+        }
+    
+        // If at homepage with no session ID, create a new one
+        if (location.pathname === '/' && !localStorage.getItem('sessionId')) {
+            createNewSession(); // No need to store the return value
+            // Wait briefly for state updates to propagate
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    
+        const newMessageId = Date.now().toString();
+    
+        const userMessage: Message = {
+            id: newMessageId,
+            content,
+            role: 'user',
+            timestamp: new Date(),
+        };
+    
+        setChats((prevChats) =>
+            prevChats.map((chat) =>
+                chat.id === selectedChatId
+                    ? { ...chat, messages: [...chat.messages, userMessage], lastUpdated: new Date() }
+                    : chat
+            )
+        );
+    
+        const loadingMessageId = `${newMessageId}-loading`;
+        setChats((prevChats) =>
+            prevChats.map((chat) =>
+                chat.id === selectedChatId
+                    ? {
+                        ...chat,
+                        messages: [
+                            ...chat.messages,
+                            {
+                                id: loadingMessageId,
+                                content: '',
+                                role: 'assistant',
+                                timestamp: new Date(),
+                                isLoading: true,
+                            },
+                        ],
+                        lastUpdated: new Date(),
+                    }
+                    : chat
+            )
+        );
+    
+        try {
+            const session_id = localStorage.getItem('sessionId') || undefined;
+            const body = {
+                query: content,
+                id: Number(user.id),
+                name: user.name || null,
+                mobile: user.mobile,
+                ...(session_id && { session_id }),
+            };
+    
+            const response = await authService.fetchWithRefresh('/api/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+    
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+    
+            const newSessionId = response.headers.get('x-session-id');
+            if (newSessionId) localStorage.setItem('sessionId', newSessionId);
+    
+            const contentType = response.headers.get('content-type');
+            const responseType = response.headers.get('x-response-type');
+    
+            if (contentType?.includes('application/json') || responseType === 'json') {
+                // Handle JSON response
+                const responseData = await response.json();
+                
+                // Log response for debugging
+                console.log("Received JSON response type:", Array.isArray(responseData) ? "array" : typeof responseData);
+                
+                // Better bus data detection
+                const isBusData = Array.isArray(responseData) && 
+                                responseData.length > 0 && 
+                                typeof responseData[0] === 'object' &&
+                                'tripID' in responseData[0];
+                
+                if (isBusData) {
+                    console.log("✅ Got bus data array:", responseData.length, "buses");
+                    
+                    // Immediately set as bus data with a special type marker
+                    setChats((prevChats) =>
+                        prevChats.map((chat) =>
+                            chat.id === selectedChatId
+                                ? {
+                                    ...chat,
+                                    messages: chat.messages.map((message) =>
+                                        message.id === loadingMessageId
+                                            ? {
+                                                ...message,
+                                                id: newMessageId,
+                                                content: responseData, // Pass the raw array
+                                                isLoading: false,
+                                                contentType: 'bus_data', // Add explicit type marker
+                                                isBusData: true, // Keep for backward compatibility
+                                            }
+                                            : message
+                                    ),
+                                    lastUpdated: new Date(),
+                                }
+                                : chat
+                        )
+                    );
+                } else {
+                    // Regular JSON response
+                    setChats((prevChats) =>
+                        prevChats.map((chat) =>
+                            chat.id === selectedChatId
+                                ? {
+                                    ...chat,
+                                    messages: chat.messages.map((message) =>
+                                        message.id === loadingMessageId
+                                            ? {
+                                                ...message,
+                                                id: newMessageId,
+                                                content: responseData,
+                                                isLoading: false,
+                                            }
+                                            : message
+                                    ),
+                                    lastUpdated: new Date(),
+                                }
+                                : chat
+                        )
+                    );
+                }
+            } else if (contentType?.includes('text/plain')) {
+                // Handle streaming response
+                const reader = response.body?.getReader();
+                const decoder = new TextDecoder();
+                let assistantMessage = '';
+                let hasBusData = false; // Track if we've found bus data
+    
+                while (reader) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    assistantMessage += decoder.decode(value, { stream: true });
+    
+                    // Check if the message contains bus data as it streams in
+                    if (!hasBusData && assistantMessage.includes('"tripID"')) {
+                        try {
+                            const busDataMatch = assistantMessage.match(/\[\s*\{(?:.|\n)*?\}\s*\]/);
+                            if (busDataMatch) {
+                                const potentialBusData = JSON.parse(busDataMatch[0]);
+                                if (Array.isArray(potentialBusData) && 
+                                    potentialBusData.length > 0 && 
+                                    'tripID' in potentialBusData[0]) {
+                                    
+                                    console.log("✅ Found bus data in stream:", potentialBusData.length, "buses");
+                                    hasBusData = true;
+                                    
+                                    // Update with bus data
+                                    setChats((prevChats) =>
+                                        prevChats.map((chat) =>
+                                            chat.id === selectedChatId
+                                                ? {
+                                                    ...chat,
+                                                    messages: chat.messages.map((message) =>
+                                                        message.id === loadingMessageId
+                                                            ? {
+                                                                ...message,
+                                                                id: newMessageId,
+                                                                content: potentialBusData, // Store actual bus object array
+                                                                isLoading: false,
+                                                                contentType: 'bus_data',
+                                                                isBusData: true,
+                                                            }
+                                                            : message
+                                                    ),
+                                                    lastUpdated: new Date(),
+                                                }
+                                                : chat
+                                        )
+                                    );
+                                    
+                                    // Stop streaming since we found bus data
+                                    break;
+                                }
+                            }
+                        } catch (e) {
+                            // Continue streaming if JSON parsing fails
+                        }
+                    }
+    
+                    // Only update with text if we haven't found bus data
+                    if (!hasBusData) {
+                        setChats((prevChats) =>
+                            prevChats.map((chat) =>
+                                chat.id === selectedChatId
+                                    ? {
+                                        ...chat,
+                                        messages: chat.messages.map((message) =>
+                                            message.id === loadingMessageId
+                                                ? {
+                                                    ...message,
+                                                    content: assistantMessage,
+                                                    isLoading: false,
+                                                }
+                                                : message
+                                        ),
+                                        lastUpdated: new Date(),
+                                    }
+                                    : chat
+                            )
+                        );
+                    }
+                }
+            } else {
+                throw new Error('Unsupported response type');
+            }
+        } catch (error) {
+            console.error('Error sending query:', error);
+            setChats((prevChats) =>
+                prevChats.map((chat) =>
+                    chat.id === selectedChatId
+                        ? {
+                            ...chat,
+                            messages: chat.messages.map((message) =>
+                                message.id === loadingMessageId
+                                    ? {
+                                        ...message,
+                                        content: 'Sorry, something went wrong. Please try again.',
+                                        isLoading: false,
+                                    }
+                                    : message
+                            ),
+                            lastUpdated: new Date(),
+                        }
+                        : chat
+                )
+            );
+        }
+    }, [selectedChatId, location.pathname, createNewSession]);
+    
+    const handleNewChat = useCallback(() => {
+        const currentChat = chats.find(chat => chat.id === selectedChatId);
+
+        if (currentChat && currentChat.messages.length <= 1) {
+            toast.error('Please start a conversation before creating a new chat');
+            return;
+        }
+
+        // Clear session ID from localStorage when creating a new chat
+        localStorage.removeItem('sessionId');
+        
+        const newChat: Chat = {
+            id: Date.now().toString(),
+            title: 'New Chat',
+            messages: [],
+            lastUpdated: new Date(),
+        };
+        
+        setChats(prevChats => [newChat, ...prevChats]);
+        setSelectedChatId(newChat.id);
+        localStorage.setItem('sessionId', newChat.id);
+        
+        // Navigate to the new session URL
+        navigate(`/c/${newChat.id}`);
+    }, [selectedChatId, chats, navigate]);
+
+    // Add this effect to handle URL session ID
+    useEffect(() => {
+        if (urlSessionId) {
+            // If URL has session ID, load and select that chat
+            setSelectedChatId(urlSessionId);
+            localStorage.setItem('sessionId', urlSessionId);
+            
+            // Load the conversation if not already in state
+            const chatExists = chats.some(chat => chat.id === urlSessionId);
+            if (!chatExists && isAuthenticated) {
+                loadConversation(urlSessionId);
+            }
+        } else if (isAuthenticated) {
+            // If authenticated but no session in URL, check localStorage
+            const storedSessionId = localStorage.getItem('sessionId');
+            if (storedSessionId) {
+                // If there's a stored session, navigate to it
+                navigate(`/c/${storedSessionId}`, { replace: true });
+            } else if (location.pathname === '/') {
+                // If at homepage with no session, create one
+                createNewSession();
+            }
+        }
+    }, [urlSessionId, isAuthenticated, chats, navigate, location.pathname, createNewSession]);
+
+    const loadConversation = useCallback(async (conversationId: string) => {
+        try {
+            const userStr = localStorage.getItem('user');
+            let user: { id?: string; name?: string; mobile?: string } = {};
+            try {
+                user = userStr && userStr !== "undefined" ? JSON.parse(userStr) : {};
+            } catch {
+                user = {};
+            }
+    
+            if (!user.id) {
+                toast.error("User not found");
+                return;
+            }
+    
+            // Fetch conversation history
+            const historyResponse = await authService.fetchWithRefresh(
+                `/api/history?user_id=${user.id}&session_id=${conversationId}`
+            );
+    
+            if (!historyResponse.ok) {
+                throw new Error('Failed to fetch conversation history');
+            }
+    
+            const historyData = await historyResponse.json();
+    
+            // Format messages from history
+            const formattedMessages: Message[] = historyData.history
+                .filter((msg: any) => msg.role !== 'meta') // Filter out meta messages
+                .map((msg: any, index: number) => ({
+                    id: `${conversationId}-${index}`,
+                    role: msg.role as 'user' | 'assistant',
+                    content: msg.content,
+                    timestamp: new Date(),
+                    isLoading: false
+                }));
+    
+            // Create new chat with loaded messages
+            const loadedChat: Chat = {
+                id: conversationId,
+                title: 'Loaded Conversation',
+                messages: formattedMessages,
+                lastUpdated: new Date()
+            };
+    
+            // Update chats state
+            setChats(prevChats => {
+                const exists = prevChats.some(c => c.id === conversationId);
+                if (exists) {
+                    return prevChats.map(c =>
+                        c.id === conversationId ? loadedChat : c
+                    );
+                } else {
+                    return [loadedChat, ...prevChats];
+                }
+            });
+    
+            setSelectedChatId(conversationId);
+            localStorage.setItem('sessionId', conversationId);
+            
+            // Navigate to the conversation URL
+            if (location.pathname !== `/c/${conversationId}`) {
+                navigate(`/c/${conversationId}`);
+            }
+            
+            toast.success('Conversation loaded successfully');
+        } catch (error) {
+            console.error('Error loading conversation:', error);
+            toast.error('Failed to load conversation');
+        }
+    }, [setChats, setSelectedChatId, navigate, location.pathname]);
+
+    // Keep existing scroll effect
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [selectedChatId, chats]);
+
+    const selectedChat = chats.find(chat => chat.id === selectedChatId);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [selectedChat?.messages]);
+
+
+
+    return (
+        <div className="h-[100dvh] flex flex-col bg-[var(--color-app-bg)] text-[var(--color-text)] overflow-hidden">
+            <Toaster position="top-center" />
+            <header
+                className="fixed top-0 left-0 w-full h-12 flex items-center justify-between px-2 sm:px-5 bg-[var(--color-header-bg)] whitespace-nowrap z-50"
+            >
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                        onClick={toggleSidebar}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-dark-hover rounded-lg transition-colors duration-200"
+                        aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            className="w-5 sm:w-6 h-5 sm:h-6"
+                        >
+                            <path
+                                d="M18 4H6C4.89543 4 4 4.89543 4 6V18C4 19.1046 4.89543 20 6 20H18C19.1046 20 20 19.1046 20 18V6C20 4.89543 19.1046 4 18 4Z"
+                                fill="none"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="stroke-gray-700 dark:stroke-gray-300"
+                            />
+                            <path
+                                d="M9 4V20"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="stroke-gray-700 dark:stroke-gray-300"
+                            />
+                            <circle
+                                cx="6.5"
+                                cy="8"
+                                r="1"
+                                className="fill-gray-700 dark:fill-gray-300"
+                            />
+                            <circle
+                                cx="6.5"
+                                cy="12"
+                                r="1"
+                                className="fill-gray-700 dark:fill-gray-300"
+                            />
+                        </svg>
+                    </button>
+
+                    {/* Adjusted logo size */}
+                    <Logo className="h-6 sm:h-8 w-auto" />
+                </div>
+
+                {/* Hide "Ṧ.AI" on mobile */}
+                <div className="hidden sm:block absolute left-1/2 transform -translate-x-1/2 text-center font-semibold text-base sm:text-lg">
+                    <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
+                </div>
+
+                <div className="ml-auto flex items-center gap-1 flex-shrink-0">
+                    {isAuthenticated ? (
+                        <div className="relative">
+                            <div
+                                className="w-6 sm:w-6 h-5 sm:h-5 cursor-pointer"
+                                onClick={() => setShowLogout((prev) => !prev)}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                                    <circle
+                                        cx="256"
+                                        cy="256"
+                                        r="256"
+                                        fill={theme === "dark" ? "#FBE822" : "#1765F3"}
+                                    />
+                                    <circle
+                                        cx="256"
+                                        cy="192"
+                                        r="80"
+                                        fill={theme === "dark" ? "#1765F3" : "#FBE822"}
+                                    />
+                                    <path
+                                        d="M256 288 C 160 288, 80 352, 80 432 L 432 432 C 432 352, 352 288, 256 288 Z"
+                                        fill={theme === "dark" ? "#1765F3" : "#FBE822"}
+                                    />
+                                </svg>
+                            </div>
+                            {showLogout && (
+                                <button
+                                onClick={async () => {
+                                  await authService.logout(); // Perform the logout process
+                                  window.dispatchEvent(new Event("storage")); // Trigger storage event to update auth state
+                                  toast.success("Logged out successfully!");
+                                  setShowLogout(false);
+                                  navigate('/', { replace: true });
+                                  window.location.reload(); // Refresh the page after logout
+                                  setTimeout(() => window.location.reload(), 100);
+                                }}
+                                
+                                className={`absolute top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 ${
+                                  theme === "dark"
+                                    ? "bg-[#FBE822] text-[#1765F3] hover:bg-[#fcef4d]"
+                                    : "bg-[#1765F3] text-[#FBE822] hover:bg-[#1e7af3]"
+                                }`}
+                              >
+                                Logout
+                              </button>
+                            )}
+                        </div>
+                    ) : (
+                        <button
+                            onClick={onOpen}
+                            className={`px-3 py-1 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 ${theme === "dark"
+                                ? "bg-[#FBE822] text-[#1765F3] hover:bg-[#fcef4d]"
+                                : "bg-[#1765F3] text-[#FBE822] hover:bg-[#1e7af3]"
+                                }`}
+                        >
+                            User Login
+                        </button>
+                    )}
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-dark-hover rounded-lg transition-colors duration-200"
+                        aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+                    >
+                        {theme === "light" ? (
+                            <Moon size={20} className="text-gray-700" />
+                        ) : (
+                            <Sun size={20} className="text-gray-300" />
+                        )}
+                    </button>
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col" style={{ marginTop: '8vh' }}>
+                <div className="flex-1 flex overflow-hidden">
+                    <Sidebar
+                        isOpen={isSidebarOpen}
+                        onClose={() => setIsSidebarOpen(false)}
+                        chats={chats}
+                        selectedChatId={selectedChatId}
+                        onChatSelect={setSelectedChatId}
+                        onNewChat={handleNewChat}
+                        onLoadConversation={loadConversation} // Pass the loadConversation function
+                    />
+                        <div className="flex-1 flex flex-col items-center justify-center" >
+                            {(chats[0].messages.length === 0) ? (
+                                <div className="flex flex-col items-center justify-center w-[90%] gap-4 ">
+                                    <Logo className="h-16 w-auto" /> {/* Freshbus logo */}
+                                    <div className="flex items-center justify-center gap-1 font-semibold text-base sm:text-lg">
+                                        <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
+                                        <span className="text-gray-700 dark:text-gray-300">- Your assistant for Freshbus bookings</span>
+                                    </div>
+                                    <div className="w-[100%] mx-auto max-w-md">
+                                        <ChatInput onSend={handleSendMessage} />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col h-full w-full">
+                                    {/* Scrollable Chat Messages */}
+                                    <div
+                                        className="flex-1 overflow-y-auto hide-scrollbar"
+                                        style={{
+                                            maxHeight: 'calc(100vh - 25vh)', 
+                                            marginTop: '0.5rem',
+                                            marginLeft: '1rem',
+                                            marginRight: '1rem',
+                                        }}>
+                                        <div className=" w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6">
+                                            <div className="py-1.5 space-y-1">
+                                                {selectedChat?.messages.map((message) => (
+                                                    <ChatMessage
+                                                        key={message.id}
+                                                        message={message}
+                                                        onBook={(busId) => {
+                                                            console.log(`Booking bus with ID: ${busId}`);
+                                                            // Add your booking logic here
+                                                        }}
+                                                    />
+                                                ))}
+                                                <div ref={messagesEndRef} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Fixed Chat Input */}
+                                    <div
+                                        className="bg-[var(--color-app-bg)] fixed bottom-3 left-0 w-full flex items-center justify-center"
+                                    >
+                                        <div className="w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6">
+                                            <ChatInput onSend={handleSendMessage} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function App() {
+    const [chats, setChats] = useState<Chat[]>(mockChats);
+    console.log("App component rendered with chats:", chats);
+
+    return (
+        <BrowserRouter> 
+            <ThemeProvider>
+                <LoginModalProvider>
+                    <Routes>
+                        <Route path="/" element={<Layout chats={chats} setChats={setChats} />} />
+                        // session id URL
+                        <Route path="/c/:sessionId" element={<Layout chats={chats} setChats={setChats} />} />
+                        <Route path="/dashboard" element={<Layout chats={chats} setChats={setChats} />} />
+                        {/* Payment callback route */}
+                        <Route path="/payment/callback" element={<PaymentCallback />} />
+                    </Routes>
+                    <LoginModal />
+                    <ToastContainer
+                        position="top-right"
+                        autoClose={3000}
+                        hideProgressBar={false}
+                        newestOnTop
+                        closeOnClick
+                        rtl={false}
+                        pauseOnFocusLoss
+                        draggable
+                        pauseOnHover
+                    />
+                </LoginModalProvider>
+            </ThemeProvider>
+        </BrowserRouter>
+    );
+}
+
+export default App;
