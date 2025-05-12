@@ -160,19 +160,19 @@ function PaymentCallback() {
               timeStyle: 'short',
             });
 
-            const summary = `
-            🎉 Congratulations on your bus booking, ${passenger?.name || 'Passenger'}! Here's a summary of your trip:
-            PNR: ${ticket.invoiceNumber}
-            Route: ${ticket.source} ➡️ ${ticket.destination}
-            Boarding Point: ${ticket.boardingPoint}, ${formatTime(ticket.boardingTime)} 🚌
-            Dropping Point: ${ticket.droppingPoint}, ${formatTime(ticket.droppingTime)}
-            Seat: ${passenger?.seat || 'N/A'}
-            Final Fare: ₹${bill
-              .reduce((total, item) => total + parseFloat(item.value.replace(/[^\d.-]/g, '')), 0)
-              .toFixed(2)} 💰
-
-            Have a safe and comfortable journey! 🌟
-          `.trim();
+            const summary = [
+              `🎉 Congratulations on your bus booking, ${passenger?.name || 'Passenger'}!`,
+              `Here's a summary of your trip:`,
+              `PNR: ${ticket.invoiceNumber}`,
+              `Route: ${ticket.source} ➡️ ${ticket.destination}`,
+              `Boarding Point: ${ticket.boardingPoint}, ${formatTime(ticket.boardingTime)} 🚌`,
+              `Dropping Point: ${ticket.droppingPoint}, ${formatTime(ticket.droppingTime)}`,
+              `Seat: ${passenger?.seat || 'N/A'}`,
+              `Final Fare: ₹${bill
+                .reduce((total, item) => total + parseFloat(item.value.replace(/[^\d.-]/g, '')), 0)
+                .toFixed(2)} 💰`,
+              `Have a safe and comfortable journey! 🌟`,
+            ].join('\n');
 
           // 4. Store for chat to pick up
           localStorage.setItem('paymentStatus', JSON.stringify({ sessionId, summary }));

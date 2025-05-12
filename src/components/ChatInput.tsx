@@ -100,9 +100,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
         placeholder="Type your message..."
         className="flex-1 bg-transparent border-none outline-none resize-none text-sm sm:text-base text-gray-800 dark:text-gray-200 px-2 overflow-y-auto custom-scrollbar"
         style={{
-          maxHeight: '150px', // Maximum height of the textarea
           height: 'auto', // Automatically adjust height
-          lineHeight: '24px', // Align text vertically
+  
+          display: 'flex',
+          alignItems: 'center',
         }}
       />
 

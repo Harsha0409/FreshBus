@@ -18,10 +18,6 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import PaymentCallback from './components/PaymentCallback'; // Import your payment callback component
 
 
-
-
-
-
 const mockChats: Chat[] = [
     {
         id: '1',
@@ -689,9 +685,9 @@ useEffect(() => {
                     />
                         <div className="flex-1 flex flex-col items-center justify-center" >
                             {(chats[0].messages.length === 0) ? (
-                                <div className="flex flex-col items-center justify-center w-[90%] gap-4 ">
+                                <div className="flex flex-col items-center justify-center w-[90%] gap-1">
                                     <Logo className="h-16 w-auto" /> {/* Freshbus logo */}
-                                    <div className="flex items-center justify-center gap-1 font-semibold text-base sm:text-lg">
+                                    <div className="flex items-center justify-center font-semibold text-base sm:text-lg">
                                         <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
                                         <span className="text-gray-700 dark:text-gray-300">- Your assistant for Freshbus bookings</span>
                                     </div>

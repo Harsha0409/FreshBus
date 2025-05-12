@@ -63,6 +63,7 @@ export interface Bus {
   allBoardingPoints: BoardingPoint[];
   allDroppingPoints: DroppingPoint[];
   recommended_seats: RecommendedSeats;
+ 
 }
 
 export interface BoardingPoint {
