@@ -18,7 +18,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   const [passengerDetails, setPassengerDetails] = useState([
     { name: '', age: null, gender: 'Male' }, // Default to one passenger
   ]);
- 
+
   const [dropdownOpen, setDropdownOpen] = useState<{ boarding: boolean; dropping: boolean }>({
     boarding: false,
     dropping: false,
@@ -162,44 +162,90 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
 
   return (
     <div className="space-y-4">
-      {/* Render Seats for the Trip */}
+
+      {/* Header: Journey Details */}
       <div
-        className="rounded-lg shadow-md p-4 cursor-pointer"
+        className="rounded-lg shadow-md p-4 cursor-pointer transition-colors"
         style={{
-          backgroundColor: 'var(--color-primary)', // Always use the primary blue color
+          backgroundColor: 'var(--color-primary)', // Default background color
           color: 'var(--color-text-off-white)', // Text color remains dynamic
         }}
         onClick={handleCardClick} // Open modal on card click
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-secondary)')} // Change background on hover
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary)')} // Revert background on mouse leave
       >
-        {/* Seats Section */}
-        <div className="text-sm font-medium">
-          <strong>Seats:</strong>{' '}
-          {allSeats
-            ?.map(
-              (seat: Seat) =>
-                `${seat.seat_number}(${seat.type === 'window' ? 'W' : 'A'})`
-            )
-            .join(' ')}
+
+
+        {/* Second Part: Trip Start, Duration, and End Details */}
+        <div className="flex items-center justify-between">
+          {/* Start Details */}
+          <div className="text-left">
+            <p className="text-sm">{bus.from}</p>
+            <p className="text-sm">{convertToIST(bus.startTime).time}</p>
+          </div>
+
+          {/* Duration */}
+          <div className="flex flex-col items-center mx-4">
+            <div className="w-full h-[1px] bg-gray-200 mb-1"></div>
+            <p className="text-sm font-semibold">Duration: {bus.duration}</p>
+            <div className="w-full h-[1px] bg-gray-200 mt-1"></div>
+          </div>
+
+          {/* End Details */}
+          <div className="text-right">
+            <p className="text-sm">{bus.to}</p>
+            <p className="text-sm">{convertToIST(bus.endTime).time}</p>
+          </div>
         </div>
-        <div className="text-sm font-medium mt-2">
-  <strong>Total Base Fare:</strong> ₹
-  {allSeats.length > 0
-    ? allSeats.reduce((total, seat) => total + (seat.fare_details?.['Base Fare'] || 0), 0).toFixed(2)
-    : '0.00'}
-</div>
 
         {/* Boarding and Dropping Points */}
-        <div className="mt-2">
+        <div className="flex flex-row justify-between mt-2">
           <p className="text-xs">
-            <strong>Boarding:</strong> {bus.allBoardingPoints[0]?.boarding_point.name} at{' '}
-            {convertToIST(bus.allBoardingPoints[0]?.currentTime).time}
+            <strong>Boarding:</strong> {bus.allBoardingPoints[0]?.boarding_point.name}
           </p>
           <p className="text-xs">
-            <strong>Dropping:</strong> {bus.allDroppingPoints[0]?.dropping_point.name} at{' '}
-            {convertToIST(bus.allDroppingPoints[0]?.currentTime).time}
+            <strong>Dropping:</strong> {bus.allDroppingPoints[0]?.dropping_point.name}
           </p>
         </div>
+
+        <div className="flex flex-row justify-between mt-2">
+          <div className="text-xs font-medium">
+            {/* Recommended Seats Heading */}
+            <div>
+              <strong>Recommended Seats:</strong>
+            </div>
+
+            {/* Seat Numbers */}
+            <div className="grid grid-cols-3">
+              {allSeats?.map((seat: Seat, index) => (
+                <div key={index} className="text-xs">
+                  {`${seat.seat_number}(${seat.type === 'window' ? 'W' : 'A'})`}
+                </div>
+              ))}
+            </div>
+          </div>
+
+
+
+          <div className="text-xs font-medium">
+            {/* Total Base Fare Heading */}
+            <div>
+              <strong>Total Base Fare:</strong>
+            </div>
+
+            {/* Total Price with GST */}
+            <div>
+              ₹
+              {allSeats.length > 0
+                ? allSeats.reduce((total, seat) => total + (seat.fare_details?.['Base Fare'] || 0), 0).toFixed(0)
+                : '0.00'}{' '}
+              /- + GST
+            </div>
+          </div>
+        </div>
+
       </div>
+
 
       {/* Modal for Trip Review */}
       {isModalOpen && (
@@ -242,10 +288,13 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
               {/* Third Part: Boarding and Dropping Points */}
               <div className="flex items-center justify-between mt-2">
                 {/* Boarding Point */}
-                <div className="w-1/2 pr-2">
+                <div className="w-1/2 pr-2 relative">
                   <button
                     onClick={() =>
-                      setDropdownOpen((prev) => ({ ...prev, boarding: !prev.boarding }))
+                      setDropdownOpen((prev) => ({
+                        boarding: !prev.boarding,
+                        dropping: false, // Close the dropping dropdown when boarding is opened
+                      }))
                     }
                     className={`w-full flex items-center justify-between text-xs ${theme === 'dark'
                       ? 'bg-gray-800 hover:bg-gray-700'
@@ -259,29 +308,33 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                   </button>
                   {dropdownOpen.boarding && (
                     <div
-                      className={`absolute z-10 mt-0.5 w-auto space-y-1 border rounded-lg p-1 custom-scrollbar ${theme === 'dark'
+                      className={`absolute z-10 mt-0.5 space-y-1 border rounded-lg p-1 custom-scrollbar ${theme === 'dark'
                         ? 'bg-gray-800 border-gray-700'
                         : 'bg-gray-50 border-gray-200'
                         }`}
                       style={{
                         maxHeight: '150px',
                         overflowY: 'auto',
+                        width: '100%', // Matches the width of the button
                       }}
                     >
                       {bus.allBoardingPoints.map((point) => {
-                        const { date, time } = convertToIST(point.currentTime);
+                        const { time } = convertToIST(point.currentTime);
+                        const isSelected = selectedBoarding === point.boarding_point.name;
                         return (
                           <button
                             key={point.boarding_point_id}
-                            className="dropdown-item w-full p-1 text-left rounded gap-1 text-xs"
+                            className={`dropdown-item w-full p-1 text-left rounded gap-1 text-xs ${isSelected
+                              ? 'bg-[var(--color-primary)] text-white'
+                              : 'hover:bg-[var(--color-secondary)] hover:text-white'
+                              }`}
                             onClick={() => {
                               setSelectedBoarding(point.boarding_point.name);
                               setDropdownOpen((prev) => ({ ...prev, boarding: false }));
                             }}
                           >
-                            <p className="text-[10px] text-gray-500">{date}</p>
                             <p className="font-medium">{point.boarding_point.name}</p>
-                            <p className="text-[10px] text-gray-500">
+                            <p className="text-[10px] text-gray-300">
                               {time} - {point.boarding_point.landmark}
                             </p>
                           </button>
@@ -292,10 +345,13 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                 </div>
 
                 {/* Dropping Point */}
-                <div className="w-1/2 pl-2">
+                <div className="w-1/2 pl-2 relative">
                   <button
                     onClick={() =>
-                      setDropdownOpen((prev) => ({ ...prev, dropping: !prev.dropping }))
+                      setDropdownOpen((prev) => ({
+                        dropping: !prev.dropping,
+                        boarding: false, // Close the boarding dropdown when dropping is opened
+                      }))
                     }
                     className={`w-full flex items-center justify-between text-xs ${theme === 'dark'
                       ? 'bg-gray-800 hover:bg-gray-700'
@@ -307,36 +363,35 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                     </span>
                     <span className="text-gray-500 dark:text-gray-400 ml-2">▼</span>
                   </button>
-
                   {dropdownOpen.dropping && (
                     <div
-                      className={`absolute z-10 mt-0.5 w-auto space-y-1 border rounded-lg p-1 custom-scrollbar ${theme === 'dark'
+                      className={`absolute z-10 mt-0.5 space-y-1 border rounded-lg p-1 custom-scrollbar ${theme === 'dark'
                         ? 'bg-gray-800 border-gray-700'
                         : 'bg-gray-50 border-gray-200'
                         }`}
                       style={{
                         maxHeight: '150px',
                         overflowY: 'auto',
-                        width: '100%',
-                        // left: '0',
-                        // right: '0',
-
+                        width: '100%', // Matches the width of the button
                       }}
                     >
                       {bus.allDroppingPoints.map((point) => {
-                        const { date, time } = convertToIST(point.currentTime);
+                        const { time } = convertToIST(point.currentTime);
+                        const isSelected = selectedDropping === point.dropping_point.name;
                         return (
                           <button
                             key={point.dropping_point_id}
-                            className="dropdown-item w-full p-1 text-left rounded gap-1 text-xs"
+                            className={`dropdown-item w-full p-1 text-left rounded gap-1 text-xs ${isSelected
+                              ? 'bg-[var(--color-primary)] text-white'
+                              : 'hover:bg-[var(--color-secondary)] hover:text-white'
+                              }`}
                             onClick={() => {
                               setSelectedDropping(point.dropping_point.name);
                               setDropdownOpen((prev) => ({ ...prev, dropping: false }));
                             }}
                           >
-                            <p className="text-[10px] text-gray-500">{date}</p>
                             <p className="font-medium">{point.dropping_point.name}</p>
-                            <p className="text-[10px] text-gray-500">
+                            <p className="text-[10px] text-gray-300">
                               {time} - {point.dropping_point.landmark}
                             </p>
                           </button>
@@ -350,7 +405,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
 
             {/* Body: Fare and Passenger Details */}
             <div className="p-4">
-              <div className="flex justify-between">
+              <div className="flex">
                 {/* Left Side: Seat Details */}
                 <div className="space-y-1">
                   <p className="text-sm">
@@ -361,25 +416,60 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                       ?.map((seat) => `${seat.seat_number}(${seat.type === 'window' ? 'W' : 'A'})`)
                       .join(', ')}
                   </p>
+                  {/* Rectangle Boxes for Names */}
+                  <div
+                    className="flex flex-wrap bg-gray-600  gap-2 overflow-y-auto custom-scrollbar"
+                    style={{ height: '60px', width: '220px', padding: '5px', borderRadius: '8px' }}
+                  >
+                    {selectedSeats.map((seat, index) => (
+                      passengerDetails[index]?.name ? ( // Only render the rectangle if a name is entered
+                        <div
+                          key={seat.seat_id}
+                          className="flex h-7 px-2 items-center justify-between  rounded-lg text-sm bg-gray-800 "
+                        >
+                          {/* Name Display */}
+                          <span>
+                            {passengerDetails[index]?.name}
+                          </span>
+
+                          {/* Remove Button */}
+                          <button
+                            onClick={() => {
+                              // Clear the name for this passenger
+                              setPassengerDetails((prevDetails) =>
+                                prevDetails.map((detail, i) =>
+                                  i === index ? { ...detail, name: '' } : detail
+                                )
+                              );
+                            }}
+                            className="ml-2 text-red-500 hover:text-red-700"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : null // Do not render anything if no name is entered
+                    ))}
+                  </div>
                 </div>
 
                 {/* Right Side: Fare Details */}
-                <div className="space-y-1 text-right">
-                  <p className="text-sm">
-                    <strong>Base Fare:</strong> ₹
-                    {selectedSeats.reduce((total, seat) => total + (seat.fare_details?.['Base Fare'] || 0), 0)}
-                  </p>
-                  <p className="text-sm">
-                    <strong>GST:</strong> ₹
-                    {selectedSeats.reduce((total, seat) => total + (seat.fare_details?.GST || 0), 0)}
-                  </p>
-                  <p className="text-sm">
-                    <strong>Discount:</strong> ₹
-                    {selectedSeats.reduce((total, seat) => total + (seat.fare_details?.Discount || 0), 0)}
-                  </p>
-                  <p className="text-sm font-semibold">
-                    <strong>Total Fare:</strong> ₹
-                    {selectedSeats
+                <div className="space-y-1 w-[40%] text-left ml-4">
+                  <div className="flex justify-between text-sm">
+                    <strong>Base Fare:</strong>
+                    <span>₹{selectedSeats.reduce((total, seat) => total + (seat.fare_details?.['Base Fare'] || 0), 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <strong>GST:</strong>
+                    <span>₹{selectedSeats.reduce((total, seat) => total + (seat.fare_details?.GST || 0), 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <strong>Discount:</strong>
+                    <span>₹{selectedSeats.reduce((total, seat) => total + (seat.fare_details?.Discount || 0), 0)}</span>
+                  </div>
+                  <div className="border-t border-gray-300 my-2"></div>
+                  <div className="flex justify-between text-sm font-semibold">
+                    <strong>Total Fare:</strong>
+                    <span>₹{selectedSeats
                       .reduce(
                         (total, seat) =>
                           total +
@@ -388,73 +478,85 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                           (seat.fare_details?.Discount || 0),
                         0
                       )
-                      .toFixed(2)}
-                  </p>
+                      .toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-gray-300 my-2"></div>
                 </div>
               </div>
 
-{/* Passenger Details */}
-<div className="space-y-2 mt-4">
-  {passengerDetails.map((passenger, index) => (
-    <div key={index} className="flex items-center space-x-2">
-      {/* Name Input */}
-      <input
-        type="text"
-        name={`passenger_name_${index}`}
-        value={passenger.name || ''} // Bind to specific passenger's name
-        onChange={(e) => handlePassengerChange(index, 'name', e.target.value)} // Update specific passenger's name
-        placeholder="Name" 
-        className={`w-1/3 p-1 border rounded text-sm ${
-          theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'
-        }`}
-      />
+              {/* Passenger Details */}
+              <div className="space-y-2 mt-4">
+                {passengerDetails.map((passenger, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    {/* Name Input */}
+                    <input
+                      type="text"
+                      name={`passenger_name_${index}`}
+                      value={passenger.name || ''} // Bind to specific passenger's name
+                      onChange={(e) => handlePassengerChange(index, 'name', e.target.value)} // Update specific passenger's name
+                      placeholder="Name"
+                      className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'
+                        }`}
+                    />
 
-      {/* Age Input */}
-      <input
-        type="number"
-        name={`passenger_age_${index}`}
-        value={passenger.age || ''} // Bind to specific passenger's age
-        onChange={(e) => handlePassengerChange(index, 'age', Number(e.target.value))} // Update specific passenger's age
-        placeholder="Age" 
-        className={`w-1/3 p-1 border rounded text-sm ${
-          theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'
-        }`}
-      />
+                    {/* Age Input */}
+                    <input
+                      type="number"
+                      name={`passenger_age_${index}`}
+                      value={passenger.age || ''} // Bind to specific passenger's age
+                      onChange={(e) => handlePassengerChange(index, 'age', Number(e.target.value))} // Update specific passenger's age
+                      placeholder="Age"
+                      className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'
+                        }`}
+                    />
 
-      {/* Gender Selection */}
-      <select
-        name={`passenger_gender_${index}`}
-        value={passenger.gender || 'Male'} // Default to "Male"
-        onChange={(e) => handlePassengerChange(index, 'gender', e.target.value)} // Update specific passenger's gender
-        className={`w-1/3 p-1 border rounded text-sm ${
-          theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'
-        }`}
-      >
-        <option value="Male">Male</option>
-        <option value="Female">Female</option>
-      </select>
-    </div>
-  ))}
+                    {/* Gender Selection */}
+                    <select
+                      name={`passenger_gender_${index}`}
+                      value={passenger.gender || 'Male'} // Default to "Male"
+                      onChange={(e) => handlePassengerChange(index, 'gender', e.target.value)} // Update specific passenger's gender
+                      className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'
+                        }`}
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
 
-  {/* Add Passenger Button */}
-  <div className="flex justify-end mt-2">
-    <button
-      onClick={() => {
-        if (passengerDetails.length < selectedSeats.length) {
-          setPassengerDetails((prevDetails) => [
-            ...prevDetails,
-            { name: '', age: null, gender: 'Male' }, // Add a new passenger with default values
-          ]);
-        } else {
-          toast.error('Passenger details cannot exceed the number of selected seats.');
-        }
-      }}
-      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-    >
-      + Add Passenger
-    </button>
-  </div>
-</div>              {/* Buttons */}
+                    {/* Remove Button */}
+                    {index > 0 && ( // Only show the remove button for passengers other than the first one
+                      <button
+                        onClick={() => {
+                          setPassengerDetails((prevDetails) =>
+                            prevDetails.filter((_, i) => i !== index) // Remove the passenger at the current index
+                          );
+                        }}
+                        className="bg-red-500 text-white w-4 h-4 flex items-center justify-center rounded-full hover:bg-red-700"
+                      >
+                        <div className="transform -translate-y-0.5">-</div>
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Add Passenger Button */}
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={() => {
+                      if (passengerDetails.length < selectedSeats.length) {
+                        setPassengerDetails((prevDetails) => [
+                          ...prevDetails,
+                          { name: '', age: null, gender: 'Male' }, // Add a new passenger with default values
+                        ]);
+                      } else {
+                        toast.error('Passenger details cannot exceed the number of selected seats.');
+                      }
+                    }}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    + Add Passenger
+                  </button>
+                </div>
+              </div>              {/* Buttons */}
               <div className="flex justify-between mt-4">
                 <button
                   onClick={() => setIsModalOpen(false)}
