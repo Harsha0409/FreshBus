@@ -1,10 +1,11 @@
 // ChatMessage.tsx - Complete rewrite for immediate bus card rendering
 
-import  { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import BusResults from './BusResults';
+import { Sparkles } from 'lucide-react';
 
 
 interface ChatMessageProps {
@@ -16,7 +17,24 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const { theme } = useTheme();
   const isLoading = message.isLoading || false;
-  
+  const [minTimePassed, setMinTimePassed] = useState(false);
+
+  const showLoader = (isLoading && !isUser) || (!minTimePassed && !isUser);
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (isLoading && !isUser) {
+      setMinTimePassed(false);
+      timer = setTimeout(() => {
+        setMinTimePassed(true);
+      }, 7000);
+    } else {
+      setMinTimePassed(false);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isLoading, isUser]);
+
   // Single state for content - either bus data or text
   const [content, setContent] = useState<{
     type: 'bus' | 'text';
@@ -26,17 +44,17 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
   // One-time content processor that runs on mount or when message changes
   useEffect(() => {
     if (isLoading || isUser) return;
-    
+
     console.log("ChatMessage processing content:", typeof message.content);
-    
+
     // Function to detect if content is bus data
     const isBusData = (data: any): boolean => {
       try {
         // Case 1: Already an array of objects with tripID property
-        if (Array.isArray(data) && 
-            data.length > 0 && 
-            typeof data[0] === 'object' && 
-            'tripID' in data[0]) {
+        if (Array.isArray(data) &&
+          data.length > 0 &&
+          typeof data[0] === 'object' &&
+          'tripID' in data[0]) {
           console.log("✅ DETECTED BUS DATA:", data.length, "buses");
           return true;
         }
@@ -45,7 +63,7 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
         return false;
       }
     };
-    
+
     // Try to extract bus data from string
     const extractBusData = (text: string): any[] | null => {
       try {
@@ -81,7 +99,7 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
         return null;
       }
     };
-    
+
     // Main content processing
     const processContent = () => {
       // Check message.content type and process accordingly
@@ -99,25 +117,39 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
           return;
         }
       }
-      
+
       // If we get here, it's not bus data
-      setContent({ 
-        type: 'text', 
-        data: typeof message.content === 'string' 
-          ? message.content 
-          : JSON.stringify(message.content, null, 2) 
+      setContent({
+        type: 'text',
+        data: typeof message.content === 'string'
+          ? message.content
+          : JSON.stringify(message.content, null, 2)
       });
     };
-    
+
     // Process content immediately
     processContent();
   }, [message.content, isLoading, isUser]);
-  
+
   // Loading state
   if (isLoading && !isUser) {
     return (
       <div className="flex justify-start items-start">
         <div className="flex-shrink-0">
+          <div className="w-8 h-8 rounded-full  flex items-center justify-center">
+            {showLoader ? (
+              // Loader (SparkleOrbit inline)
+              <div className="relative w-8 h-8" role="status" aria-label="Loading">
+                <div className="absolute inset-0 rounded-full border-2 border-[#fbe822]/20"></div>
+                <div className="absolute inset-0 rounded-full border-2 border-transparent  border-t-[#fbe822] animate-spin"></div>
+                <div className="absolute top-1/2 left-1/2 w-3 h-3 -mt-1.5 -ml-1.5 flex items-center justify-center">
+                  <Sparkles className="text-[#fbe822] animate-pulse" size={16} fill="#fbe822" />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+        {/* <div className="flex-shrink-0">
           <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
             <img
               src="/assets/aiimg.png"
@@ -126,24 +158,21 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
               style={{ transform: 'scale(1.5)' }}
             />
           </div>
-        </div>
-        <div className="flex-1 ml-2">
-          <span className="font-medium text-gray-900 dark:text-gray-100">
-            <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
-          </span>
-          <div className="flex justify-start items-center space-x-1 mt-2">
-            <div className="w-2 h-2 bg-blue-500 dark:bg-yellow-500 rounded-full animate-dots"></div>
-            <div className="w-2 h-2 bg-blue-500 dark:bg-yellow-500 rounded-full animate-dots"></div>
-            <div className="w-2 h-2 bg-blue-500 dark:bg-yellow-500 rounded-full animate-dots"></div>
+        </div> */}
+        {!showLoader && (
+          <div className="flex-1 ml-2">
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
+            </span>
           </div>
-        </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-start py-1 mb-4 gap-1`}>
-      {/* AI Icon for Assistant Messages */}
+      {/* AI Icon for Assistant Messages
       {!isUser && (
         <div className="flex-shrink-0">
           <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-500 flex items-center justify-center">
@@ -155,7 +184,7 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
             />
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Message Content */}
       <div className={`flex-1 ${!isUser ? 'ml-2' : 'mr-2'} ${isUser ? 'text-right' : 'text-left'}`}>
