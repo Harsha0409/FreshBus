@@ -5,7 +5,11 @@
       "destination": "https://ai-api.freshbus.com/:path*"
     },
     {
-      "source": "/(.*)", 
+      "source": "/c/:id",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
