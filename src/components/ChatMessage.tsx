@@ -26,7 +26,7 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
       setMinTimePassed(false);
       timer = setTimeout(() => {
         setMinTimePassed(true);
-      }, 7000);
+      }, 5000);
     } else {
       setMinTimePassed(false);
     }
@@ -138,15 +138,32 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
         <div className="flex-shrink-0">
           <div className="w-8 h-8 rounded-full  flex items-center justify-center">
             {showLoader ? (
-              // Loader (SparkleOrbit inline)
-              <div className="relative w-8 h-8" role="status" aria-label="Loading">
-                <div className="absolute inset-0 rounded-full border-2 border-[#fbe822]/20"></div>
-                <div className="absolute inset-0 rounded-full border-2 border-transparent  border-t-[#fbe822] animate-spin"></div>
-                <div className="absolute top-1/2 left-1/2 w-3 h-3 -mt-1.5 -ml-1.5 flex items-center justify-center">
-                  <Sparkles className="text-[#fbe822] animate-pulse" size={16} fill="#fbe822" />
-                </div>
-              </div>
-            ) : null}
+  <div className="flex items-center justify-center w-8 h-8" role="status" aria-label="Loading">
+    {/* Inline animation for sparkle */}
+    <style>
+      {`
+        @keyframes sparkle-pulse {
+          0%, 100% {
+            filter: brightness(0.8);
+            transform: scale(0.9);
+          }
+          50% {
+            filter: brightness(1.5);
+            transform: scale(1.2);
+          }
+        }
+        .sparkle-pulse {
+          animation: sparkle-pulse 1.2s ease-in-out infinite;
+        }
+      `}
+    </style>
+    <Sparkles
+      className="text-[#fbe822] sparkle-pulse"
+      size={24}
+      fill="#fbe822"
+    />
+  </div>
+) : null}
           </div>
         </div>
         {/* <div className="flex-shrink-0">

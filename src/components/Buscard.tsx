@@ -19,7 +19,8 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   const [selectedBoarding, setSelectedBoarding] = useState<string | null>(bus.allBoardingPoints[0]?.boarding_point.name || null);
   const [selectedDropping, setSelectedDropping] = useState<string | null>(bus.allDroppingPoints[0]?.dropping_point.name || null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]); // State to store selected seats
+  const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]); 
+
 
   const [passengerDetails, setPassengerDetails] = useState<Passenger[]>([
     { name: '', age: undefined, gender: 'Male' }, // Default to one passenger
@@ -52,6 +53,77 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
     setSelectedSeats(allSeats); // Set all seats from the card to the modal
     setIsModalOpen(true); // Open the modal
   };
+
+const [showSkeleton, setShowSkeleton] = useState(true);  
+useEffect(() => {
+  const timer = setTimeout(() => setShowSkeleton(false), 3000);
+  return () => clearTimeout(timer);
+}, []);
+
+if (showSkeleton) {
+  return (
+    <div className="rounded-lg shadow-md p-4 w-full max-w-md bg-[#0078d4] relative overflow-hidden">
+      <style>
+        {`
+          @keyframes blurPulse {
+            0%, 100% { 
+              filter: blur(4px);
+              opacity: 0.7;
+            }
+            50% { 
+              filter: blur(8px);
+              opacity: 0.5;
+            }
+          }
+          .blur-item {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            animation: blurPulse 3s ease-in-out infinite;
+          }
+          .blur-delay-1 { animation-delay: 0s; }
+          .blur-delay-2 { animation-delay: 0.5s; }
+          .blur-delay-3 { animation-delay: 1s; }
+          
+          @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+          }
+          .bus-icon {
+            opacity: 0;
+            animation: fadeIn 1s ease-in-out forwards;
+            animation-delay: 1s;
+          }
+        `}
+      </style>
+      {/* Main content */}
+      <div className="relative">
+        {/* Bus icon overlay */}
+        <div className="bus-icon absolute inset-0 flex items-center justify-center opacity-20">
+          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+            <path d="M8 6v6"></path>
+            <path d="M15 6v6"></path>
+            <path d="M2 12h19.6"></path>
+            <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4c-1.1 0-2.1.8-2.4 1.8L.2 13c-.1.4-.2.8-.2 1.2 0 .4.1.8.2 1.2l.8 2.8H4"></path>
+            <circle cx="7" cy="18" r="2"></circle>
+            <path d="M9 18h4"></path>
+            <circle cx="17" cy="18" r="2"></circle>
+          </svg>
+        </div>
+        {/* Trip details */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="blur-item blur-delay-1 h-16 w-1/4"></div>
+          <div className="blur-item blur-delay-2 h-16 w-1/3 mx-4"></div>
+          <div className="blur-item blur-delay-3 h-16 w-1/4"></div>
+        </div>
+        {/* Seats and price */}
+        <div className="flex justify-between">
+          <div className="blur-item blur-delay-2 h-20 w-3/5 mr-2"></div>
+          <div className="blur-item blur-delay-1 h-20 w-2/5"></div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
   const convertToIST = (utcTime: string): { date: string; time: string } => {
     const date = new Date(utcTime);
@@ -244,7 +316,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
               {allSeats?.map((seat: Seat, index) => (
                 <div
                   key={index}
-                  className="text-xs bg-[#fbe822] rounded-md px-2 py-1 text-gray-900 flex items-center justify-center"
+                  className="text-xs bg-[#fbe822] rounded-md px-0.5 py-0.5 text-gray-900 flex items-center justify-center"
                   style={{ backgroundColor: 'rgba(251, 232, 34)' }} // fallback for /30
                 >
                   {`${seat.seat_number}(${seat.type === 'window' ? 'W' : 'A'})`}
@@ -497,7 +569,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
               {/* Rectangle Boxes for Names */}
               <div
                 className="mt-2 flex flex-wrap bg-gray-600 gap-1 overflow-y-auto custom-scrollbar"
-                style={{ height: '60px', width: '410px', padding: '5px', borderRadius: '8px' }}
+                style={{ height: '80px', width: '100%', padding: '5px', borderRadius: '8px' }}
               >
                 {passengerDetails.map((passenger, index) => (
                   passenger.name && passenger.age && passenger.gender ? ( // Render only if all details are entered
@@ -538,9 +610,14 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
               <div className="space-y-2 mt-4">
                 <div className="flex items-center space-x-2">
                   {/* Seat Number Box */}
-                  <div className="mr-1 bg-green-500 text-white text-xs font-medium px-1 rounded">
-                    {selectedSeats[editingIndex !== null ? editingIndex : passengerDetails.length]?.seat_number || 'N/A'}
-                  </div>
+<div className="mr-1 bg-green-500 text-white text-xs font-medium px-1 rounded flex items-center">
+  {selectedSeats[editingIndex !== null ? editingIndex : passengerDetails.length]
+    ? <>
+        <span>{selectedSeats[editingIndex !== null ? editingIndex : passengerDetails.length].seat_number}</span>
+        <span className="ml-1">({selectedSeats[editingIndex !== null ? editingIndex : passengerDetails.length].type === 'window' ? 'W' : 'A'})</span>
+      </>
+    : 'N/A'}
+</div>
                   {/* Name Input */}
                   <input
                     type="text"
@@ -581,31 +658,33 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                 </div>
                 {/* Add Passenger Button */}
                 <div className="flex justify-end mt-2">
-                  {passengerDetails.length < selectedSeats.length && (
-                    <button
-                      onClick={() => {
-                        if (!currentPassenger.name || currentPassenger.age === undefined || !currentPassenger.gender) {
-                          toast.error('Please fill in all passenger details.');
-                          return;
-                        }
-                        setPassengerDetails((prevDetails) => {
-                          const updatedDetails = [...prevDetails];
-                          if (editingIndex !== null) {
-                            updatedDetails[editingIndex] = currentPassenger;
-                            setEditingIndex(null);
-                          } else {
-                            updatedDetails.push(currentPassenger);
-                          }
-                          return updatedDetails;
-                        });
-                        setCurrentPassenger({ name: '', age: undefined, gender: 'Male' });
-                      }}
-                      className="text-[#fbe822] hover:text-blue-800 text-sm font-medium"
-                    >
-                      +{selectedSeats.length - passengerDetails.length} More Passengers
-                    </button>
-                  )}
-                </div>
+  {passengerDetails.length < selectedSeats.length ? (
+    <button
+      onClick={() => {
+        if (!currentPassenger.name || currentPassenger.age === undefined || !currentPassenger.gender) {
+          toast.error('Please fill in all passenger details.');
+          return;
+        }
+        setPassengerDetails((prevDetails) => {
+          const updatedDetails = [...prevDetails];
+          if (editingIndex !== null) {
+            updatedDetails[editingIndex] = currentPassenger;
+            setEditingIndex(null);
+          } else {
+            updatedDetails.push(currentPassenger);
+          }
+          return updatedDetails;
+        });
+        setCurrentPassenger({ name: '', age: undefined, gender: 'Male' });
+      }}
+      className="text-[#fbe822] hover:text-blue-800 text-sm font-medium"
+    >
+      +{selectedSeats.length - passengerDetails.length} More Passengers
+    </button>
+  ) : (
+    <span className="text-green-600 font-semibold text-sm">All passengers added. Proceed to payment.</span>
+  )}
+</div>
               </div>
               {/* Buttons */}
               <div className="flex justify-between mt-4">
