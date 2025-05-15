@@ -12,7 +12,7 @@ interface BusCardProps {
 const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   interface Passenger {
     name: string;
-    age: number | undefined; // Allow age to be either a number or undefined
+    age: number | undefined; 
     gender: string;
   }
   const { theme } = useTheme();

@@ -1,4 +1,4 @@
-// ChatMessage.tsx - Complete rewrite for immediate bus card rendering
+
 
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -12,6 +12,7 @@ interface ChatMessageProps {
   message: Message;
   onBook: (busId: number) => void;
 }
+
 
 export function ChatMessage({ message, onBook }: ChatMessageProps) {
   const isUser = message.role === 'user';
