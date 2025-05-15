@@ -339,7 +339,7 @@ if (showSkeleton) {
               {allSeats.length > 0
                 ? allSeats.reduce((total, seat) => total + (seat.fare_details?.['Base Fare'] || 0), 0).toFixed(0)
                 : '0.00'}{' '}
-              /- + GST
+               + GST
             </div>
           </div>
         </div>
