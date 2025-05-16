@@ -1,16 +1,16 @@
 {
-  "rewrites": [
+  "version": 2,
+  "routes": [
     {
-      "source": "/api/:path*", 
-      "destination": "https://ai-api.freshbus.com/:path*"
+      "src": "/api/(.*)",
+      "dest": "https://ai-api.freshbus.com/$1"
     },
     {
-      "source": "/c/:id",
-      "destination": "/index.html"
+      "handle": "filesystem"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "headers": [
@@ -20,11 +20,10 @@
         { "key": "Access-Control-Allow-Credentials", "value": "true" },
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
-        { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version" }
+        { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization" }
       ]
     }
   ],
   "buildCommand": "vite build",
-  "outputDirectory": "dist",
-  "cleanUrls": true
+  "outputDirectory": "dist"
 }
