@@ -1,0 +1,104 @@
+/*------------------------------------------------------------------------------
+  1. CSS Variables & Design Tokens
+------------------------------------------------------------------------------*/
+:root {
+  /* Colors */
+  --color-primary: #0078d4;
+  --color-secondary: #2b88d8;
+  --color-bg: #ffffff;
+  --color-text: #333333;
+  --color-muted: #777777;
+
+  --color-sidebar-bg: #ffffff;
+  --color-text-off-white: #f5f5f5;
+ 
+
+  /* Typography */
+  --font-base: 'Segoe UI', Arial, sans-serif;
+  --font-size-base: 16px;
+  --line-height: 1.5;
+}
+
+/* Dark Theme Variables */
+.dark {
+  --color-app-bg: #121212;
+  --color-sidebar-bg: #000000;
+  --color-header-bg: #121212;
+  --color-text: #e5e5e5;
+  --color-logo-light: #fbe822; /* logo color in dark */
+}
+
+/*------------------------------------------------------------------------------
+2. Global Reset & Normalize
+------------------------------------------------------------------------------*/
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+img, video, svg, canvas, audio {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+input, button, textarea, select {
+  font: inherit;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+/*------------------------------------------------------------------------------
+3. Custom Scrollbar
+------------------------------------------------------------------------------*/
+.custom-scrollbar {
+  scrollbar-width: thin; /* For Firefox */
+  scrollbar-color: var(--color-primary) transparent; /* For Firefox */
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px; /* Thin scrollbar width */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent; /* Transparent background */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-primary); /* Blue scrollbar thumb */
+  border-radius: 10px; /* Rounded scrollbar thumb */
+  border: 2px solid transparent; /* Adds spacing around the thumb */
+  background-clip: content-box; /* Ensures the border is visible */
+}
+
+/*------------------------------------------------------------------------------
+4. Utility Classes
+------------------------------------------------------------------------------*/
+/* Utility for centering content */
+.center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Hide scrollbar */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
+}
+
+/* Enable vertical scrolling */
+.overflow-y-auto {
+  overflow-y: auto;
+}
