@@ -1,3 +1,4 @@
+// BusCard.tsx
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { toast } from 'react-toastify';
@@ -27,18 +28,23 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   
   // Boarding and dropping points
   const [selectedBoarding, setSelectedBoarding] = useState<string | null>(
-    bus.allBoardingPoints[0]?.boarding_point.name || null
+    bus.recommended_boarding_points?.[0]?.name || 
+    bus.allBoardingPoints[0]?.boarding_point.name || 
+    null
   );
   const [selectedDropping, setSelectedDropping] = useState<string | null>(
-    bus.allDroppingPoints[0]?.dropping_point.name || null
+    bus.recommended_dropping_points?.[0]?.name || 
+    bus.allDroppingPoints[0]?.dropping_point.name || 
+    null
   );
   const [dropdownOpen, setDropdownOpen] = useState({ boarding: false, dropping: false });
 
+  // Backend passengers
+  const [backendPassengers, setBackendPassengers] = useState<Passenger[]>([]);
   
   // Seats and passengers
   const allSeats = getCategorySeats(bus, bus.category);
   const [selectedSeats, setSelectedSeats] = useState(allSeats);
-
   
   // Passenger management
   const getInitialPassenger = (index: number = 0) => {
@@ -54,11 +60,18 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
     };
   };
   
-  const [passengerDetails, setPassengerDetails] = useState<Passenger[]>([
-    getInitialPassenger(0)
-  ]);
+  const [passengerDetails, setPassengerDetails] = useState<Array<{
+    name: string;
+    age: number | undefined;
+    gender: string;
+  }>>([getInitialPassenger(0)]);
   
-  const [currentPassenger, setCurrentPassenger] = useState<Passenger>(getInitialPassenger(0));
+  const [currentPassenger, setCurrentPassenger] = useState<{
+    name: string;
+    age: number | undefined;
+    gender: string;
+  }>(getInitialPassenger(0));
+  
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [currentSeatIndex, setCurrentSeatIndex] = useState(0);
   
@@ -66,154 +79,207 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   const categoryStyle = getCategoryStyle(bus.category);
   const categoryFare = calculateCategoryFare(allSeats);
 
+  // Load backend passengers when component mounts
+  useEffect(() => {
+    try {
+      // Check if passengers are included in the bus data
+      if (bus && (bus as any).passengers) {
+        setBackendPassengers((bus as any).passengers);
+      } else {
+        // Try to get from window object or localStorage
+        let storedPassengers = null;
+        
+        if (typeof window !== 'undefined' && (window as any).busQueryResponse) {
+          storedPassengers = (window as any).busQueryResponse.passengers;
+        } else {
+          const storedData = localStorage.getItem('busQueryResponse');
+          if (storedData) {
+            try {
+              const parsed = JSON.parse(storedData);
+              if (parsed.passengers && Array.isArray(parsed.passengers)) {
+                storedPassengers = parsed.passengers;
+              }
+            } catch (e) {
+              console.error('Error parsing stored bus data:', e);
+            }
+          }
+        }
+        
+        if (storedPassengers && Array.isArray(storedPassengers)) {
+          console.log('Found passengers:', storedPassengers);
+          setBackendPassengers(storedPassengers);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading passengers:', e);
+    }
+  }, [bus]);
+
   // Effects
   useEffect(() => {
-    const timer = setTimeout(() => setShowSkeleton(false), 3000);
+    const timer = setTimeout(() => setShowSkeleton(false), 1000);
     return () => clearTimeout(timer);
   }, []);
 
-  // Update current passenger when editing index changes
+  // Initialize passenger details array with empty objects for each seat
   useEffect(() => {
-    if (editingIndex !== null) {
-      setCurrentPassenger({...passengerDetails[editingIndex]});
-      setCurrentSeatIndex(editingIndex);
-    } else {
-      // Get the index of the next passenger to add
-      const nextIndex = passengerDetails.filter(p => p.name && p.age).length;
-      if (nextIndex < selectedSeats.length) {
-        setCurrentSeatIndex(nextIndex);
-        // Update gender based on seat assignment for new passenger
-        setCurrentPassenger(getInitialPassenger(nextIndex));
-      }
+    if (selectedSeats.length > 0) {
+      const initialPassengers = selectedSeats.map((_, index) => getInitialPassenger(index));
+      setPassengerDetails(initialPassengers);
     }
-  }, [editingIndex, passengerDetails, selectedSeats]);
+  }, [selectedSeats]);
 
-  // Reset passenger details when modal opens
+  // Prepare passenger details when modal opens
   useEffect(() => {
     if (isModalOpen && selectedSeats.length > 0) {
-      // Keep only valid passengers
-      const validPassengers = passengerDetails
-        .filter((p, i) => p.name && p.age && i < selectedSeats.length)
-        .map((p, i) => ({
-          ...p,
-          gender: getSeatGender(bus, selectedSeats[i]) === 'female' ? 'Female' : p.gender
-        }));
+      // Reset passenger details based on seat count and gender
+      const initialPassengers = selectedSeats.map((seat) => {
+        const seatGender = getSeatGender(bus, seat);
+        return {
+          name: '',
+          age: undefined,
+          gender: seatGender === 'female' ? 'Female' : 'Male'
+        };
+      });
       
-      // Fill the rest with empty passengers up to seat count
-      const emptyPassengers = Array(selectedSeats.length - validPassengers.length)
-        .fill(null)
-        .map((_, i) => getInitialPassenger(validPassengers.length + i));
-      
-      setPassengerDetails([...validPassengers, ...emptyPassengers].slice(0, selectedSeats.length));
-      
-      // Set current passenger to the first incomplete one
-      const firstIncompleteIndex = validPassengers.length;
-      if (firstIncompleteIndex < selectedSeats.length) {
-        setCurrentSeatIndex(firstIncompleteIndex);
-        setCurrentPassenger(getInitialPassenger(firstIncompleteIndex));
-      }
+      setPassengerDetails(initialPassengers);
+      setCurrentPassenger(initialPassengers[0]);
+      setCurrentSeatIndex(0);
+      setEditingIndex(null);
     }
-  }, [isModalOpen, selectedSeats]);
+  }, [isModalOpen, selectedSeats, bus]);
 
   // Event handlers
   const handleCardClick = () => {
     setSelectedSeats(allSeats);
     setIsModalOpen(true);
+    
+    // Store the backend passengers in localStorage for future use
+    if (window && (window as any).busQueryResponse && (window as any).busQueryResponse.passengers) {
+      localStorage.setItem('busQueryResponse', JSON.stringify((window as any).busQueryResponse));
+    }
   };
 
   const handleConfirmPayment = async () => {
-  const filledPassengers = passengerDetails.filter(p => p.name && p.age !== undefined && p.gender);
+    const filledPassengers = passengerDetails.filter(p => p.name && p.age !== undefined && p.gender);
   
-  if (filledPassengers.length < selectedSeats.length) {
-    toast.error(`Please fill details for all ${selectedSeats.length} passengers.`);
-    return;
-  }
+    if (filledPassengers.length < selectedSeats.length) {
+      toast.error(`Please fill details for all ${selectedSeats.length} passengers.`);
+      return;
+    }
 
-  if (!selectedBoarding || !selectedDropping) {
-    toast.error('Please select both boarding and dropping points.');
-    return;
-  }
+    if (!selectedBoarding || !selectedDropping) {
+      toast.error('Please select both boarding and dropping points.');
+      return;
+    }
 
-  try {
-    setIsProcessing(true);
-    
-    // Calculate total fare for all selected seats
-    const totalFare = selectedSeats.reduce(
-      (total, seat) =>
-        total +
-        (seat.fare_details?.['Base Fare'] || 0) +
-        (seat.fare_details?.GST || 0) +
-        (seat.fare_details?.Discount || 0),
-      0
-    );
-    
-    // Get the logged-in user's mobile number - FIXED HERE
-    let userMobile = '';
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const userData = JSON.parse(userStr);
-        userMobile = userData.mobile || '';
-      } catch (e) {
-        console.error('Error parsing user data:', e);
+    try {
+      setIsProcessing(true);
+      
+      // Calculate total fare for all selected seats
+      const totalFare = selectedSeats.reduce(
+        (total, seat) =>
+          total +
+          (seat.fare_details?.['Base Fare'] || 0) +
+          (seat.fare_details?.GST || 0) +
+          (seat.fare_details?.Discount || 0),
+        0
+      );
+      
+      // Get the logged-in user's mobile number
+      let userMobile = '';
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const userData = JSON.parse(userStr);
+          userMobile = userData.mobile || '';
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
       }
-    }
-    
-    // Prepare payload according to backend expectations
-    const payload = {
-      mobile: userMobile, // Now correctly using the mobile from user object
-      email: '',
-      seat_map: passengerDetails.map((passenger, index) => ({
-        passenger_age: passenger.age,
-        seat_id: selectedSeats[index].seat_id,
-        passenger_name: passenger.name,
-        passenger_gender: passenger.gender,
-      })),
-      trip_id: bus.tripID,
-      boarding_point_id: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.boarding_point_id,
-      dropping_point_id: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.dropping_point_id,
-      boarding_point_time: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.currentTime,
-      dropping_point_time: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.currentTime,
-      total_collect_amount: totalFare.toFixed(2),
-      main_category: 1,
-      freshcardId: 1,
-      freshcard: false,
-      return_url: `${window.location.origin}/payment/callback?session_id=${localStorage.getItem('sessionId')}`,
-    };
-    
-    console.log('Booking payload:', payload);
-    
-    const response = await fetch('/api/tickets/block', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
-      },
-      body: JSON.stringify(payload),
-    });
+      
+      // Save passenger details for future bookings
+      const passengersToSave = filledPassengers.map((p) => ({
+        id: Math.floor(Math.random() * 1000000) + 1, // Random ID for new passengers
+        name: p.name,
+        gender: p.gender,
+        age: p.age || 0
+      }));
+      
+      // Merge and store unique passengers
+      let allPassengers = [...backendPassengers];
+      passengersToSave.forEach(newPass => {
+        // Only add if it's not already in the list (by name and age)
+        if (!allPassengers.some(existingPass => 
+          existingPass.name.toLowerCase() === newPass.name.toLowerCase() && 
+          existingPass.age === newPass.age)) {
+          allPassengers.push(newPass);
+        }
+      });
+      
+      // Store in localStorage for future use
+      localStorage.setItem('recentPassengers', JSON.stringify(allPassengers));
+      
+      // Prepare payload according to backend expectations
+      const payload = {
+        mobile: userMobile,
+        email: '',
+        seat_map: passengerDetails.map((passenger, index) => ({
+          passenger_age: passenger.age,
+          seat_id: selectedSeats[index].seat_id,
+          passenger_name: passenger.name,
+          passenger_gender: passenger.gender,
+        })),
+        trip_id: bus.tripID,
+        boarding_point_id: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.boarding_point_id,
+        dropping_point_id: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.dropping_point_id,
+        boarding_point_time: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.currentTime,
+        dropping_point_time: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.currentTime,
+        total_collect_amount: totalFare.toFixed(2),
+        main_category: 1,
+        freshcardId: 1,
+        freshcard: false,
+        return_url: `${window.location.origin}/payment/callback?session_id=${localStorage.getItem('sessionId')}`,
+      };
+      
+      console.log('Booking payload:', payload);
+      
+      const response = await fetch('/api/tickets/block', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to block ticket');
-    }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to block ticket');
+      }
 
-    const data = await response.json();
-    if (data.api_order_id) {
-      localStorage.setItem('current_order_id', data.api_order_id);
-    }
+      const data = await response.json();
+      if (data.api_order_id) {
+        localStorage.setItem('current_order_id', data.api_order_id);
+      }
 
-    if (!data.payment_url) {
-      throw new Error('Payment URL not found in server response. Please try again.');
-    }
+      if (!data.payment_url) {
+        throw new Error('Payment URL not found in server response. Please try again.');
+      }
 
-    toast.success('Redirecting to payment portal...');
-    window.open(data.payment_url, '_blank');
-  } catch (error: any) {
-    toast.error(error.message || 'An error occurred during payment.');
-  } finally {
-    setIsProcessing(false);
-  }
-};
+      toast.success('Redirecting to payment portal...');
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.location.href = data.payment_url;
+      } else {
+        window.location.href = data.payment_url;
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred during payment.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleAddOrUpdatePassenger = () => {
     if (!currentPassenger.name || currentPassenger.age === undefined || !currentPassenger.gender) {
@@ -247,6 +313,19 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
     }
   };
 
+  // Function to select a passenger from the backend list
+  const handleSelectPassenger = (backendPassenger: Passenger) => {
+    // Get the seat's required gender
+    const seatGender = getSeatGender(bus, selectedSeats[currentSeatIndex]);
+    const gender = seatGender === 'female' ? 'Female' : backendPassenger.gender;
+    
+    setCurrentPassenger({
+      name: backendPassenger.name,
+      age: backendPassenger.age,
+      gender
+    });
+  };
+
   // Helper function to determine the text for the add passenger button
   const getAddPassengerButtonText = () => {
     const filledPassengers = passengerDetails.filter(p => p.name && p.age !== undefined && p.gender);
@@ -277,6 +356,60 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   
   const areAllPassengersValid = getFilledPassengersCount() === selectedSeats.length;
 
+  // Render passenger suggestions from backend
+  const renderPassengerSuggestions = () => {
+    if (backendPassengers.length === 0 || editingIndex !== null) {
+      return null;
+    }
+    
+    // Get the seat's required gender
+    const seatGender = getSeatGender(bus, selectedSeats[currentSeatIndex]);
+    const requiredGender = seatGender || null;
+    
+    // Get names of already added passengers to avoid duplicates
+    const addedNames = passengerDetails
+      .filter(p => p.name)
+      .map(p => p.name.toLowerCase().trim());
+    
+    // Filter passengers that match the seat gender requirements and aren't already added
+    const filteredPassengers = backendPassengers.filter(p => {
+      // Skip already added passengers
+      if (addedNames.includes(p.name.toLowerCase().trim())) {
+        return false;
+      }
+      
+      // If seat is reserved for specific gender, filter accordingly
+      if (requiredGender === 'female' && p.gender !== 'Female') {
+        return false;
+      }
+      if (requiredGender === 'male' && p.gender !== 'Male') {
+        return false;
+      }
+      
+      return true;
+    }).slice(0, 3); // Limit to 3 suggestions
+    
+    if (filteredPassengers.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="mt-2">
+        <p className="text-xs text-gray-500 dark:text-gray-400">Quick select:</p>
+        <div className="flex flex-wrap gap-1 mt-1">
+          {filteredPassengers.map((passenger, idx) => (
+            <button
+              key={idx}
+              className="px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-800/40"
+              onClick={() => handleSelectPassenger(passenger)}
+            >
+              {passenger.name} ({passenger.age})
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   // Render skeleton during loading
   if (showSkeleton) {
@@ -394,12 +527,11 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
               </div>
             </div>
             
-            <div
-              className={`px-2 py-1 mt-3 rounded-lg font-bold text-xs shadow ${categoryStyle.textColor}`}
+           <div
+              className={`px-2 py-1 mt-3 rounded-lg font-bold text-[10px] sm:text-xs shadow ${categoryStyle.textColor}`}
               style={{
                 background: categoryStyle.background,
                 boxShadow: '0 2px 8px 0 rgba(255, 215, 0, 0.2)',
-                border: '1px solid #FFD700',
               }}
             >
               {bus.category}
@@ -616,11 +748,19 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
               
               {/* Passenger List */}
               <div className="mt-2 flex flex-wrap gap-1 overflow-y-auto custom-scrollbar"
-                   style={{ maxHeight: '80px', width: '100%', padding: '5px', borderRadius: '8px' }}>
+                 style={{ maxHeight: '80px', width: '100%', padding: '5px', borderRadius: '8px' }}>
                 {passengerDetails.map((passenger, index) =>
                   passenger.name && passenger.age ? (
-                    <div key={index} className="flex h-7 px-2 items-center justify-between rounded-lg text-sm text-gray-800 dark:text-white border border-gray-300 dark:border-gray-700"
-                         style={{ background: 'transparent' }}>
+                    <div
+                      key={index}
+                      className="flex h-7 px-2 items-center justify-between rounded-lg text-sm text-gray-800 dark:text-white border border-gray-300 dark:border-gray-700"
+                      style={{ background: 'transparent', cursor: 'pointer' }}
+                      onClick={() => {
+                        setEditingIndex(index);
+                        setCurrentPassenger({ ...passenger });
+                        setCurrentSeatIndex(index);
+                      }}
+                    >
                       <span className="flex items-center">
                         <div className={`mr-1 text-black text-xs font-medium px-1 rounded ${
                           selectedSeats[index] ? getSeatBackgroundColor(bus, selectedSeats[index]) : 'bg-green-500'
@@ -633,7 +773,12 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                         {passenger.name}
                       </span>
                       <button
-                        onClick={() => setEditingIndex(index)}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setEditingIndex(index);
+                          setCurrentPassenger({ ...passenger });
+                          setCurrentSeatIndex(index);
+                        }}
                         className="ml-1 text-blue-400 hover:text-blue-600"
                       >
                         ✎
@@ -643,79 +788,82 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                 )}
               </div>
 
-{/* Passenger Input Form - Only show if not all passengers filled or if editing */}
-{(!areAllPassengersValid || editingIndex !== null) && (
-  <div className="space-y-2 mt-4">
-    <div className="flex items-center space-x-2">
-      {/* Seat display with proper styling based on gender */}
-      {selectedSeats[currentSeatIndex] && (
-        <div className={`mr-1 text-black text-xs font-medium px-1 rounded flex items-center ${
-          getSeatBackgroundColor(bus, selectedSeats[currentSeatIndex])
-        }`}>
-          <span>
-            {selectedSeats[currentSeatIndex].seat_number}
-          </span>
-          <span className="ml-1">
-            ({selectedSeats[currentSeatIndex].type === 'window' ? 'W' : 'A'})
-          </span>
-        </div>
-      )}
-      
-      <input
-        type="text"
-        value={currentPassenger.name || ''}
-        onChange={(e) => setCurrentPassenger({ ...currentPassenger, name: e.target.value })}
-        placeholder="Name"
-        className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
-      />
-      
-      <input
-        type="number"
-        value={currentPassenger.age ?? ''}
-        onChange={(e) => {
-          const value = e.target.value;
-          setCurrentPassenger({
-            ...currentPassenger,
-            age: value === '' ? undefined : Number(value),
-          });
-        }}
-        placeholder="Age"
-        className={`w-1/3 p-1 border rounded text-sm appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
-        style={{ MozAppearance: 'textfield' }}
-        onWheel={e => (e.target as HTMLInputElement).blur()}
-      />
-      
-      <select
-        value={currentPassenger.gender}
-        onChange={(e) => setCurrentPassenger({ ...currentPassenger, gender: e.target.value })}
-        className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
-      >
-        <option value="" disabled>Select Gender</option>
-        <option value="Male">Male</option>
-        <option value="Female">Female</option>
-      </select>
-    </div>
-    
-    {/* Add/Update Passenger Button */}
-    <div className="flex justify-end mt-2">
-      <button
-        onClick={handleAddOrUpdatePassenger}
-        className="bg-[#fbe822] hover:bg-[#f2d800] text-gray-900 font-medium py-1 px-3 rounded-lg text-sm shadow-sm transition-colors"
-      >
-        {getAddPassengerButtonText()}
-      </button>
-    </div>
-  </div>
-)}
+              {/* Passenger Input Form - Only show if not all passengers filled or if editing */}
+              {(!areAllPassengersValid || editingIndex !== null) && (
+                <div className="space-y-2 mt-4">
+                  <div className="flex items-center space-x-2">
+                    {/* Seat display with proper styling based on gender */}
+                    {selectedSeats[currentSeatIndex] && (
+                      <div className={`mr-1 text-black text-xs font-medium px-1 rounded flex items-center ${
+                        getSeatBackgroundColor(bus, selectedSeats[currentSeatIndex])
+                      }`}>
+                        <span>
+                          {selectedSeats[currentSeatIndex].seat_number}
+                        </span>
+                        <span className="ml-1">
+                          ({selectedSeats[currentSeatIndex].type === 'window' ? 'W' : 'A'})
+                        </span>
+                      </div>
+                    )}
+                    
+                    <input
+                      type="text"
+                      value={currentPassenger.name || ''}
+                      onChange={(e) => setCurrentPassenger({ ...currentPassenger, name: e.target.value })}
+                      placeholder="Name"
+                      className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                    />
+                    
+                    <input
+                      type="number"
+                      value={currentPassenger.age ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setCurrentPassenger({
+                          ...currentPassenger,
+                          age: value === '' ? undefined : Number(value),
+                        });
+                      }}
+                      placeholder="Age"
+                      className={`w-1/3 p-1 border rounded text-sm appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      style={{ MozAppearance: 'textfield' }}
+                      onWheel={e => (e.target as HTMLInputElement).blur()}
+                    />
+                    
+                    <select
+                      value={currentPassenger.gender}
+                      onChange={(e) => setCurrentPassenger({ ...currentPassenger, gender: e.target.value })}
+                      className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                    >
+                      <option value="" disabled>Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                  
+                  {/* Passenger suggestions */}
+                  {renderPassengerSuggestions()}
+                  
+                  {/* Add/Update Passenger Button */}
+                  <div className="flex justify-end mt-2">
+                    <button
+                      onClick={handleAddOrUpdatePassenger}
+                      className="bg-[#fbe822] hover:bg-[#f2d800] text-gray-900 font-medium py-1 px-3 rounded-lg text-sm shadow-sm transition-colors"
+                    >
+                      {getAddPassengerButtonText()}
+                    </button>
+                  </div>
+                </div>
+              )}
 
-{/* Show a message when all passengers are added */}
-{areAllPassengersValid && !editingIndex && (
-  <div className="mt-4 text-center">
-    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-      ✓ All passenger details completed
-    </p>
-  </div>
-)}
+              {/* Show a message when all passengers are added */}
+              {areAllPassengersValid && !editingIndex && (
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                    ✓ All passenger details completed
+                  </p>
+                </div>
+              )}
               
               {/* Action Buttons */}
               <div className="flex justify-between mt-4">

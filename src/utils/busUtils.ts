@@ -133,23 +133,23 @@ export function getCategoryStyle(category: CategoryType): { background: string; 
   switch (category) {
     case 'Premium':
       return {
-        background: 'linear-gradient(90deg, #B8860B 0%, #FFD700 100%)',
+        background: 'linear-gradient(135deg, #FFD700 0%, #FFF700 25%, #FFD700 50%, #D4AF37 75%, #FFD700 100%)',
         textColor: 'text-gray-900'
       };
     case 'Reasonable':
       return {
-        background: 'linear-gradient(90deg, #0078d4 0%, #00BFFF 100%)',
-        textColor: 'text-white'
+        background: 'linear-gradient(135deg, #E8E8E8 0%, #FFFFFF 25%, #C0C0C0 50%, #A8A8A8 75%, #E8E8E8 100%)',
+        textColor: 'text-gray-900'
       };
     case 'Budget-Friendly':
       return {
-        background: 'linear-gradient(90deg, #32CD32 0%, #90EE90 100%)',
+        background: 'linear-gradient(135deg, #CD7F32 0%, #FFB347 25%, #CD7F32 50%, #A0522D 75%, #CD7F32 100%)',
         textColor: 'text-gray-900'
       };
     default:
       return {
         background: 'linear-gradient(90deg, #6c757d 0%, #adb5bd 100%)',
-        textColor: 'text-white'
+        textColor: 'text-gray-900'
       };
   }
 }

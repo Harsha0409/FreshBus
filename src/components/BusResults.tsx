@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import BusCard from './Buscard';
-import { Bus, RecommendedPoint, BoardingPoint, DroppingPoint, RecommendedSeats, GenderAssignments } from '../types/chat';
+import { Bus, RecommendedPoint, BoardingPoint, DroppingPoint, RecommendedSeats, GenderAssignments, Passenger, BusQueryResponse } from '../types/chat';
 import { flattenBusesByCategory } from '../utils/busUtils';
 
 interface BusResultsProps {
-  searchQuery?: Bus[] | any;
+  searchQuery?: Bus[] | BusQueryResponse | any;
   onBook: (busId: number) => void;
 }
 
 const BusResults: React.FC<BusResultsProps> = ({ searchQuery, onBook }) => {
   const [busData, setBusData] = useState<Bus[]>([]);
+  const [passengersData, setPassengersData] = useState<Passenger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEmptyResponse, setIsEmptyResponse] = useState(false);
@@ -30,45 +31,58 @@ const BusResults: React.FC<BusResultsProps> = ({ searchQuery, onBook }) => {
   };
 
   // Safely parse JSON with error handling
-const safeJsonParse = (jsonString: string) => {
-  try {
-    return JSON.parse(jsonString);
-  } catch (e) {
-    // Try to extract the first valid JSON object or array from the string
+  const safeJsonParse = (jsonString: string) => {
     try {
-      // Find the first '{' and the matching closing '}' for the main object
-      let objStart = jsonString.indexOf('{');
-      if (objStart !== -1) {
-        let braceCount = 0;
-        for (let i = objStart; i < jsonString.length; i++) {
-          if (jsonString[i] === '{') braceCount++;
-          if (jsonString[i] === '}') braceCount--;
-          if (braceCount === 0) {
-            const objStr = jsonString.substring(objStart, i + 1);
-            return JSON.parse(objStr);
+      return JSON.parse(jsonString);
+    } catch (e) {
+      // Try to extract the first valid JSON object or array from the string
+      try {
+        // Find the first '{' and the matching closing '}' for the main object
+        let objStart = jsonString.indexOf('{');
+        if (objStart !== -1) {
+          let braceCount = 0;
+          for (let i = objStart; i < jsonString.length; i++) {
+            if (jsonString[i] === '{') braceCount++;
+            if (jsonString[i] === '}') braceCount--;
+            if (braceCount === 0) {
+              const objStr = jsonString.substring(objStart, i + 1);
+              return JSON.parse(objStr);
+            }
           }
         }
-      }
-      // Try to extract the first array (if object not found)
-      let arrayStart = jsonString.indexOf('[');
-      if (arrayStart !== -1) {
-        let bracketCount = 0;
-        for (let i = arrayStart; i < jsonString.length; i++) {
-          if (jsonString[i] === '[') bracketCount++;
-          if (jsonString[i] === ']') bracketCount--;
-          if (bracketCount === 0) {
-            const arrStr = jsonString.substring(arrayStart, i + 1);
-            return JSON.parse(arrStr);
+        // Try to extract the first array (if object not found)
+        let arrayStart = jsonString.indexOf('[');
+        if (arrayStart !== -1) {
+          let bracketCount = 0;
+          for (let i = arrayStart; i < jsonString.length; i++) {
+            if (jsonString[i] === '[') bracketCount++;
+            if (jsonString[i] === ']') bracketCount--;
+            if (bracketCount === 0) {
+              const arrStr = jsonString.substring(arrayStart, i + 1);
+              return JSON.parse(arrStr);
+            }
           }
         }
+      } catch (extractErr) {
+        console.error("Failed to extract valid JSON:", extractErr);
+        throw e;
       }
-    } catch (extractErr) {
-      console.error("Failed to extract valid JSON:", extractErr);
       throw e;
     }
-    throw e;
-  }
-};
+  };
+  
+  // Store the query response in global scope for BusCard to access
+  useEffect(() => {
+    // Make passengers data globally available
+    if (searchQuery && typeof searchQuery === 'object' && searchQuery.passengers) {
+      // Store in window object for easy access from other components
+      if (typeof window !== 'undefined') {
+        (window as any).busQueryResponse = searchQuery;
+      }
+      setPassengersData(searchQuery.passengers);
+    }
+  }, [searchQuery]);
+
   useEffect(() => {
     const processSearchQuery = async () => {
       setLoading(true);
@@ -125,6 +139,11 @@ const safeJsonParse = (jsonString: string) => {
           'tripID' in searchQuery.recommendations[0]
         ) {
           console.log("Processing recommendations array:", searchQuery.recommendations);
+          // Save passengers data if available
+          if (searchQuery.passengers && Array.isArray(searchQuery.passengers)) {
+            setPassengersData(searchQuery.passengers);
+          }
+          
           setBusData(normalizeData(searchQuery.recommendations));
           setLoading(false);
           return;
@@ -175,6 +194,11 @@ const safeJsonParse = (jsonString: string) => {
                 'tripID' in parsed.recommendations[0]
               ) {
                 console.log("Found recommendations in parsed object:", parsed.recommendations);
+                // Save passengers data if available
+                if (parsed.passengers && Array.isArray(parsed.passengers)) {
+                  setPassengersData(parsed.passengers);
+                }
+                
                 setBusData(normalizeData(parsed.recommendations));
                 setLoading(false);
                 return;
@@ -254,6 +278,20 @@ const safeJsonParse = (jsonString: string) => {
             const startTimeMatch = /"startTime":\s*"([^"]+)"/.exec(searchQuery);
             const endTimeMatch = /"endTime":\s*"([^"]+)"/.exec(searchQuery);
 
+            // Try to extract passengers array
+            try {
+              const passengersMatch = searchQuery.match(/"passengers"\s*:\s*(\[.*?\])/s);
+              if (passengersMatch && passengersMatch[1]) {
+                const passengersJson = passengersMatch[1];
+                const passengers = JSON.parse(passengersJson);
+                if (Array.isArray(passengers)) {
+                  setPassengersData(passengers);
+                }
+              }
+            } catch (e) {
+              console.error("Failed to parse passengers array:", e);
+            }
+
             if (tripIDMatch && fromMatch && toMatch) {
               console.log("Manual extraction successful");
               
@@ -317,6 +355,7 @@ const safeJsonParse = (jsonString: string) => {
   // Add debug logging to see what's in the processed data
   useEffect(() => {
     console.log("BusResults processed busData:", busData);
+    console.log("BusResults processed passengersData:", passengersData);
     
     if (busData.length > 0) {
       // Log the first bus data to check its structure
@@ -332,7 +371,7 @@ const safeJsonParse = (jsonString: string) => {
       console.log("Flattened buses by category:", flattenedBuses);
       console.log("Number of category-specific bus cards:", flattenedBuses.length);
     }
-  }, [busData]);
+  }, [busData, passengersData]);
 
   if (loading) {
     return <p className="text-center text-gray-500">Loading buses...</p>;
@@ -364,13 +403,19 @@ const safeJsonParse = (jsonString: string) => {
     return <p className="text-center text-gray-500">No buses with available seats found.</p>;
   }
 
+  // Add passengers data to each bus object before passing to BusCard
+  const categoryBusesWithPassengers = categoryBuses.map(bus => ({
+    ...bus,
+    passengers: passengersData
+  }));
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2">
-      {categoryBuses.map((categoryBus) => (
+      {categoryBusesWithPassengers.map((categoryBus) => (
         <BusCard 
           key={`${categoryBus.tripID}-${categoryBus.category}`} 
-          bus={categoryBus} 
-          onBook={onBook} 
+          bus={categoryBus}
+          onBook={onBook}
         />
       ))}
     </div>

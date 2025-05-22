@@ -341,9 +341,9 @@ useEffect(() => {
             ) : (
               <div className="flex flex-col h-full w-full">
                 <div
-                  className="flex-1 overflow-y-auto hide-scrollbar"
+                  className="flex-1 overflow-y-auto hide-scrollbar pb-20"
                   style={{
-                    maxHeight: 'calc(100vh - 25vh)',
+                    maxHeight: 'calc(100vh - 9rem)',
                     marginTop: '0.5rem',
                     marginLeft: '1rem',
                     marginRight: '1rem',
@@ -354,8 +354,7 @@ useEffect(() => {
                         <ChatMessage
                           key={message.id}
                           message={message}
-                          onBook={() => {
-                            // Add your booking logic here
+                          onBook={() => { 
                           }}
                         />
                       ))}
