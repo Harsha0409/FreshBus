@@ -1,5 +1,3 @@
-
-
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message } from '../types/chat';
@@ -7,12 +5,10 @@ import { useTheme } from '../context/ThemeContext';
 import BusResults from './BusResults';
 import { Sparkles } from 'lucide-react';
 
-
 interface ChatMessageProps {
   message: Message;
   onBook: (busId: number) => void;
 }
-
 
 export function ChatMessage({ message, onBook }: ChatMessageProps) {
   const isUser = message.role === 'user';
@@ -41,62 +37,64 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
     type: 'bus' | 'text';
     data: any;
   }>({ type: 'text', data: '' });
-  console.log("ChatMessage initial content:", content);
+
   // One-time content processor that runs on mount or when message changes
   useEffect(() => {
     if (isLoading || isUser) return;
 
-    console.log("ChatMessage processing content:", typeof message.content);
+    // Use a timeout to ensure consistent behavior across browsers
+    const timer = setTimeout(() => {
+      console.log("ChatMessage processing content type:", typeof message.content);
 
-    // Function to detect if content is bus data
-    const isBusData = (data: any): boolean => {
-      try {
-        // Case 1: Already an array of objects with tripID property
-        if (Array.isArray(data) &&
-          data.length > 0 &&
-          typeof data[0] === 'object' &&
-          'tripID' in data[0]) {
-          console.log("✅ DETECTED BUS DATA:", data.length, "buses");
-          return true;
-        }
-        return false;
-      } catch (e) {
-        return false;
-      }
-    };
+      // Function to detect if string contains empty recommendations
+      const isEmptyRecommendations = (str: string): boolean => {
+        return (str.includes('"recommendations": []') || 
+                str.includes('"recommendations":[]'));
+      };
 
-    // Try to extract bus data from string
-    const extractBusData = (text: string): any[] | null => {
-  try {
-    // Try to parse the entire string
-    const parsed = JSON.parse(text);
-    // If parsed is { recommendations: [...] }
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      Array.isArray(parsed.recommendations) &&
-      parsed.recommendations.length > 0 &&
-      typeof parsed.recommendations[0] === 'object' &&
-      'tripID' in parsed.recommendations[0]
-    ) {
-      return parsed.recommendations;
-    }
-    // If parsed is an array of bus objects
-    if (
-      Array.isArray(parsed) &&
-      parsed.length > 0 &&
-      typeof parsed[0] === 'object' &&
-      'tripID' in parsed[0]
-    ) {
-      return parsed;
-    }
-  } catch (e) {
-    // If parsing fails, try to extract a JSON array from the string
-    const match = text.match(/\[\s*\{(?:.|\n)*?\}\s*\]/g);
-    if (match) {
-      for (const potentialJson of match) {
+      // Function to detect if content is bus data
+      const isBusData = (data: any): boolean => {
         try {
-          const parsed = JSON.parse(potentialJson);
+          // Case 1: Already an array of objects with tripID property
+          if (Array.isArray(data) &&
+            data.length > 0 &&
+            typeof data[0] === 'object' &&
+            'tripID' in data[0]) {
+            console.log("✅ DETECTED BUS DATA:", data.length, "buses");
+            return true;
+          }
+          
+          // Case 2: Object with recommendations array
+          if (typeof data === 'object' && 
+              data !== null && 
+              Array.isArray(data.recommendations)) {
+            // Even empty recommendations should be treated as bus data
+            console.log("✅ DETECTED RECOMMENDATIONS:", 
+                       data.recommendations.length > 0 ? data.recommendations.length + " buses" : "empty");
+            return true;
+          }
+          
+          return false;
+        } catch (e) {
+          console.error("Error in isBusData:", e);
+          return false;
+        }
+      };
+
+      // Try to extract bus data from string
+      const extractBusData = (text: string): any[] | null => {
+        try {
+          // Try to parse the entire string
+          const parsed = JSON.parse(text);
+          // If parsed is { recommendations: [...] }
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            Array.isArray(parsed.recommendations)
+          ) {
+            return parsed.recommendations;
+          }
+          // If parsed is an array of bus objects
           if (
             Array.isArray(parsed) &&
             parsed.length > 0 &&
@@ -105,43 +103,78 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
           ) {
             return parsed;
           }
-        } catch {
-          // Continue to next match
+        } catch (e) {
+          // If parsing fails, try to extract a JSON array from the string
+          const match = text.match(/\[\s*\{(?:.|\n)*?\}\s*\]/g);
+          if (match) {
+            for (const potentialJson of match) {
+              try {
+                const parsed = JSON.parse(potentialJson);
+                if (
+                  Array.isArray(parsed) &&
+                  parsed.length > 0 &&
+                  typeof parsed[0] === 'object' &&
+                  'tripID' in parsed[0]
+                ) {
+                  return parsed;
+                }
+              } catch {
+                // Continue to next match
+              }
+            }
+          }
         }
-      }
-    }
-  }
-  return null;
-};
-    // Main content processing
-    const processContent = () => {
-      // Check message.content type and process accordingly
-      if (typeof message.content === 'object') {
-        // Direct object - check if it's bus data
-        if (isBusData(message.content)) {
-          setContent({ type: 'bus', data: message.content });
-          return;
-        }
-      } else if (typeof message.content === 'string') {
-        // String content - try to extract bus data
-        const busData = extractBusData(message.content);
-        if (busData) {
-          setContent({ type: 'bus', data: busData });
-          return;
-        }
-      }
+        return null;
+      };
 
-      // If we get here, it's not bus data
-      setContent({
-        type: 'text',
-        data: typeof message.content === 'string'
-          ? message.content
-          : JSON.stringify(message.content, null, 2)
-      });
-    };
+      // Main content processing
+      const processContent = () => {
+        // Check message.content type and process accordingly
+        if (typeof message.content === 'object') {
+          // Direct object - check if it's bus data
+          if (isBusData(message.content)) {
+            setContent({ type: 'bus', data: message.content });
+            return;
+          }
+        } else if (typeof message.content === 'string') {
+          // First check if it's empty recommendations
+          if (isEmptyRecommendations(message.content)) {
+            console.log("✅ DETECTED EMPTY RECOMMENDATIONS");
+            setContent({ type: 'bus', data: { recommendations: [] } });
+            return;
+          }
+          
+          // Try to extract bus data from the string
+          const busData = extractBusData(message.content);
+          if (busData) {
+            console.log("✅ EXTRACTED BUS DATA FROM STRING");
+            setContent({ type: 'bus', data: busData });
+            return;
+          }
+          
+          // Check for trip IDs and other bus data indicators
+          const hasTripsPattern = /"tripID":|"from":|"to":|"duration":|"startTime":/;
+          if (hasTripsPattern.test(message.content)) {
+            console.log("✅ DETECTED BUS DATA PATTERNS");
+            setContent({ type: 'bus', data: message.content });
+            return;
+          }
+        }
 
-    // Process content immediately
-    processContent();
+        // If we get here, it's not bus data
+        setContent({
+          type: 'text',
+          data: typeof message.content === 'string'
+            ? message.content
+            : JSON.stringify(message.content, null, 2)
+        });
+      };
+
+      // Process content immediately
+      processContent();
+    }, 50); // Small timeout to ensure consistent behavior
+
+    return () => clearTimeout(timer);
   }, [message.content, isLoading, isUser]);
 
   // Loading state
@@ -149,46 +182,36 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
     return (
       <div className="flex justify-start items-start">
         <div className="flex-shrink-0">
-          <div className="w-8 h-8 rounded-full  flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center">
             {showLoader ? (
-  <div className="flex items-center justify-center w-8 h-8" role="status" aria-label="Loading">
-    {/* Inline animation for sparkle */}
-    <style>
-      {`
-        @keyframes sparkle-pulse {
-          0%, 100% {
-            filter: brightness(0.8);
-            transform: scale(0.9);
-          }
-          50% {
-            filter: brightness(1.5);
-            transform: scale(1.2);
-          }
-        }
-        .sparkle-pulse {
-          animation: sparkle-pulse 1.2s ease-in-out infinite;
-        }
-      `}
-    </style>
-    <Sparkles
-      className="text-[#fbe822] sparkle-pulse"
-      size={24}
-      fill="#fbe822"
-    />
-  </div>
-) : null}
+              <div className="flex items-center justify-center w-8 h-8" role="status" aria-label="Loading">
+                {/* Inline animation for sparkle */}
+                <style>
+                  {`
+                    @keyframes sparkle-pulse {
+                      0%, 100% {
+                        filter: brightness(0.8);
+                        transform: scale(0.9);
+                      }
+                      50% {
+                        filter: brightness(1.5);
+                        transform: scale(1.2);
+                      }
+                    }
+                    .sparkle-pulse {
+                      animation: sparkle-pulse 1.2s ease-in-out infinite;
+                    }
+                  `}
+                </style>
+                <Sparkles
+                  className="text-[#fbe822] sparkle-pulse"
+                  size={24}
+                  fill="#fbe822"
+                />
+              </div>
+            ) : null}
           </div>
         </div>
-        {/* <div className="flex-shrink-0">
-          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-            <img
-              src="/assets/aiimg.png"
-              alt="AI Icon"
-              className="w-4 h-4 object-contain"
-              style={{ transform: 'scale(1.5)' }}
-            />
-          </div>
-        </div> */}
         {!showLoader && (
           <div className="flex-1 ml-2">
             <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -202,20 +225,6 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-start py-1 mb-4 gap-1`}>
-      {/* AI Icon for Assistant Messages
-      {!isUser && (
-        <div className="flex-shrink-0">
-          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-500 flex items-center justify-center">
-            <img
-              src="/assets/aiimg.png"
-              alt="AI Icon"
-              className="w-3 h-3 sm:w-4 sm:h-4 object-contain"
-              style={{ transform: 'scale(1.5)' }}
-            />
-          </div>
-        </div>
-      )} */}
-
       {/* Message Content */}
       <div className={`flex-1 ${!isUser ? 'ml-2' : 'mr-2'} ${isUser ? 'text-right' : 'text-left'}`}>
         <div className="flex items-center gap-1 justify-between">
@@ -229,9 +238,11 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
         </div>
 
         {/* Content Rendering - Bus Results or Text */}
-        {message.content.includes('"tripID"') || message.content.includes('[{') || message.content.includes('{"tripID"') ? (
+        {content.type === 'bus' || 
+         message.content.includes('"tripID"') || 
+         message.content.includes('"recommendations"') ? (
           <div className="mt-2 w-full">
-            <BusResults searchQuery={content.data} onBook={onBook} />
+            <BusResults searchQuery={content.type === 'bus' ? content.data : message.content} onBook={onBook} />
           </div>
         ) : (
           <div className="prose dark:prose-invert max-w-none mt-1 text-xs sm:text-sm">

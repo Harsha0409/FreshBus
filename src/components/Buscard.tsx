@@ -167,7 +167,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
         passenger_age: passenger.age,
         seat_id: selectedSeats[index].seat_id,
         passenger_name: passenger.name,
-        gender: passenger.gender,
+        passenger_gender: passenger.gender,
       })),
       trip_id: bus.tripID,
       boarding_point_id: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.boarding_point_id,
