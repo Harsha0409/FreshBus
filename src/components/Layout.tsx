@@ -282,8 +282,8 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                     window.location.reload();
                   }}
                   className={`absolute top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 ${theme === "dark"
-                      ? "bg-[#FBE822] text-[#1765F3] hover:bg-[#fcef4d]"
-                      : "bg-[#1765F3] text-[#FBE822] hover:bg-[#1e7af3]"
+                    ? "bg-[#FBE822] text-[#1765F3] hover:bg-[#fcef4d]"
+                    : "bg-[#1765F3] text-[#FBE822] hover:bg-[#1e7af3]"
                     }`}
                 >
                   Logout
@@ -340,40 +340,24 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
             ) : (
               <div className="flex flex-col h-full w-full pb-20">
                 {/* Chat messages area */}
-                <div
-                  className="overflow-y-auto hide-scrollbar"
-                  style={{
-                    position: 'fixed',
-                    top: '3rem', // header height
-                    left: 0,
-                    right: 0,
-                    bottom: '4.5rem', // input height + bottom gap
-                    margin: '0 auto',
-                    width: '98%',
-                    maxWidth: '75vw',
-                    paddingLeft: '0.5rem',
-                    paddingRight: '0.5rem',
-                    paddingTop: '0.5rem',
-                    paddingBottom: '0.5rem',
-                    zIndex: 10,
-                  }}
-                >
-                  <div className="py-1.5 space-y-1">
-                    {selectedChat?.messages.map((message) => (
-                      <ChatMessage
-                        key={message.id}
-                        message={message}
-                        onBook={() => { }}
-                      />
-                    ))}
-                    <div ref={messagesEndRef} />
+                <div className="fixed left-0 right-0" style={{ top: '3rem', bottom: '4.5rem', zIndex: 10 }}>
+                  <div className="w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6 h-full overflow-y-auto hide-scrollbar">
+                    <div className="py-1.5 space-y-1">
+                      {selectedChat?.messages.map((message) => (
+                        <ChatMessage
+                          key={message.id}
+                          message={message}
+                          onBook={() => { }}
+                        />
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
                   </div>
                 </div>
-                {/* Chat input fixed at bottom */}
                 <div
                   className="bg-[var(--color-app-bg)] fixed left-0 bottom-0 w-full flex items-center justify-center"
                   style={{
-                    height: '4.5rem', // match the bottom offset above
+                    height: '4.5rem',
                     zIndex: 20,
                   }}
                 >
