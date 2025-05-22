@@ -45,56 +45,56 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
   );
 
   const handleSendMessageHelper = useCallback(
-  (content: string) => {
-    // Check if there's a payment status to display
-    const paymentStatusStr = localStorage.getItem('paymentStatus');
-    if (paymentStatusStr) {
-      try {
-        const paymentStatus = JSON.parse(paymentStatusStr);
-        if (paymentStatus.sessionId === selectedChatId && paymentStatus.summary) {
-          // Create an AI message with the payment summary
-          setChats(prevChats => prevChats.map(chat => {
-            if (chat.id === selectedChatId) {
-              return {
-                ...chat,
-                messages: [
-                  ...chat.messages,
-                  {
-                    id: `payment-confirmation-${Date.now()}`,
-                    role: 'assistant',
-                    content: paymentStatus.summary,
-                    timestamp: new Date()
-                  }
-                ],
-                lastUpdated: new Date()
-              };
-            }
-            return chat;
-          }));
-          
-          // Remove the payment status from localStorage after using it
+    (content: string) => {
+      // Check if there's a payment status to display
+      const paymentStatusStr = localStorage.getItem('paymentStatus');
+      if (paymentStatusStr) {
+        try {
+          const paymentStatus = JSON.parse(paymentStatusStr);
+          if (paymentStatus.sessionId === selectedChatId && paymentStatus.summary) {
+            // Create an AI message with the payment summary
+            setChats(prevChats => prevChats.map(chat => {
+              if (chat.id === selectedChatId) {
+                return {
+                  ...chat,
+                  messages: [
+                    ...chat.messages,
+                    {
+                      id: `payment-confirmation-${Date.now()}`,
+                      role: 'assistant',
+                      content: paymentStatus.summary,
+                      timestamp: new Date()
+                    }
+                  ],
+                  lastUpdated: new Date()
+                };
+              }
+              return chat;
+            }));
+
+            // Remove the payment status from localStorage after using it
+            localStorage.removeItem('paymentStatus');
+
+            // Don't need to handle the actual message if we're displaying payment status
+            return;
+          }
+        } catch (error) {
+          console.error('Error parsing payment status:', error);
           localStorage.removeItem('paymentStatus');
-          
-          // Don't need to handle the actual message if we're displaying payment status
-          return;
         }
-      } catch (error) {
-        console.error('Error parsing payment status:', error);
-        localStorage.removeItem('paymentStatus');
       }
-    }
-    
-    // Continue with the original message handling logic
-    handleSendMessage(
-      content,
-      selectedChatId,
-      setChats,
-      location.pathname,
-      createNewSessionHelper
-    );
-  },
-  [selectedChatId, setChats, location.pathname, createNewSessionHelper]
-);
+
+      // Continue with the original message handling logic
+      handleSendMessage(
+        content,
+        selectedChatId,
+        setChats,
+        location.pathname,
+        createNewSessionHelper
+      );
+    },
+    [selectedChatId, setChats, location.pathname, createNewSessionHelper]
+  );
   const handleNewChatHelper = useCallback(
     () =>
       handleNewChat(
@@ -123,46 +123,46 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
     if (sessionId) setSelectedChatId(sessionId);
   }, [sessionId]);
 
-// Add this effect in Layout.tsx near your other useEffect hooks
-useEffect(() => {
-  // Check for payment status when chat loads or changes
-  const paymentStatusStr = localStorage.getItem('paymentStatus');
-  if (paymentStatusStr) {
-    try {
-      const paymentStatus = JSON.parse(paymentStatusStr);
-      if (paymentStatus.sessionId === selectedChatId && paymentStatus.summary) {
-        // Add a slight delay to ensure the UI is ready
-        setTimeout(() => {
-          // Create an AI message with the payment summary
-          setChats(prevChats => prevChats.map(chat => {
-            if (chat.id === selectedChatId) {
-              return {
-                ...chat,
-                messages: [
-                  ...chat.messages,
-                  {
-                    id: `payment-confirmation-${Date.now()}`,
-                    role: 'assistant',
-                    content: paymentStatus.summary,
-                    timestamp: new Date()
-                  }
-                ],
-                lastUpdated: new Date()
-              };
-            }
-            return chat;
-          }));
-          
-          // Remove the payment status from localStorage after using it
-          localStorage.removeItem('paymentStatus');
-        }, 500);
+  // Add this effect in Layout.tsx near your other useEffect hooks
+  useEffect(() => {
+    // Check for payment status when chat loads or changes
+    const paymentStatusStr = localStorage.getItem('paymentStatus');
+    if (paymentStatusStr) {
+      try {
+        const paymentStatus = JSON.parse(paymentStatusStr);
+        if (paymentStatus.sessionId === selectedChatId && paymentStatus.summary) {
+          // Add a slight delay to ensure the UI is ready
+          setTimeout(() => {
+            // Create an AI message with the payment summary
+            setChats(prevChats => prevChats.map(chat => {
+              if (chat.id === selectedChatId) {
+                return {
+                  ...chat,
+                  messages: [
+                    ...chat.messages,
+                    {
+                      id: `payment-confirmation-${Date.now()}`,
+                      role: 'assistant',
+                      content: paymentStatus.summary,
+                      timestamp: new Date()
+                    }
+                  ],
+                  lastUpdated: new Date()
+                };
+              }
+              return chat;
+            }));
+
+            // Remove the payment status from localStorage after using it
+            localStorage.removeItem('paymentStatus');
+          }, 500);
+        }
+      } catch (error) {
+        console.error('Error parsing payment status:', error);
+        localStorage.removeItem('paymentStatus');
       }
-    } catch (error) {
-      console.error('Error parsing payment status:', error);
-      localStorage.removeItem('paymentStatus');
     }
-  }
-}, [selectedChatId, setChats]);
+  }, [selectedChatId, setChats]);
 
   useEffect(() => {
     if (urlSessionId) {
@@ -206,38 +206,38 @@ useEffect(() => {
             aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
             <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            className="w-5 sm:w-6 h-5 sm:h-6"
-                        >
-                            <path
-                                d="M18 4H6C4.89543 4 4 4.89543 4 6V18C4 19.1046 4.89543 20 6 20H18C19.1046 20 20 19.1046 20 18V6C20 4.89543 19.1046 4 18 4Z"
-                                fill="none"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="stroke-gray-700 dark:stroke-gray-300"
-                            />
-                            <path
-                                d="M9 4V20"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="stroke-gray-700 dark:stroke-gray-300"
-                            />
-                            <circle
-                                cx="6.5"
-                                cy="8"
-                                r="1"
-                                className="fill-gray-700 dark:fill-gray-300"
-                            />
-                            <circle
-                                cx="6.5"
-                                cy="12"
-                                r="1"
-                                className="fill-gray-700 dark:fill-gray-300"
-                            />
-                        </svg>
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              className="w-5 sm:w-6 h-5 sm:h-6"
+            >
+              <path
+                d="M18 4H6C4.89543 4 4 4.89543 4 6V18C4 19.1046 4.89543 20 6 20H18C19.1046 20 20 19.1046 20 18V6C20 4.89543 19.1046 4 18 4Z"
+                fill="none"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="stroke-gray-700 dark:stroke-gray-300"
+              />
+              <path
+                d="M9 4V20"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="stroke-gray-700 dark:stroke-gray-300"
+              />
+              <circle
+                cx="6.5"
+                cy="8"
+                r="1"
+                className="fill-gray-700 dark:fill-gray-300"
+              />
+              <circle
+                cx="6.5"
+                cy="12"
+                r="1"
+                className="fill-gray-700 dark:fill-gray-300"
+              />
+            </svg>
           </button>
           <Logo className="h-6 sm:h-8 w-auto" />
         </div>
@@ -281,11 +281,10 @@ useEffect(() => {
                     navigate('/', { replace: true });
                     window.location.reload();
                   }}
-                  className={`absolute top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 ${
-                    theme === "dark"
+                  className={`absolute top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 ${theme === "dark"
                       ? "bg-[#FBE822] text-[#1765F3] hover:bg-[#fcef4d]"
                       : "bg-[#1765F3] text-[#FBE822] hover:bg-[#1e7af3]"
-                  }`}
+                    }`}
                 >
                   Logout
                 </button>
@@ -339,33 +338,46 @@ useEffect(() => {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col h-full w-full">
+              <div className="flex flex-col h-full w-full pb-20">
+                {/* Chat messages area */}
                 <div
-                  className="flex-1 overflow-y-auto hide-scrollbar pb-20"
+                  className="overflow-y-auto hide-scrollbar"
                   style={{
-                    maxHeight: 'calc(100vh - 9rem)',
-                    marginTop: '0.5rem',
-                    marginLeft: '1rem',
-                    marginRight: '1rem',
-                  }}>
-                  <div className=" w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6">
-                    <div className="py-1.5 space-y-1">
-                      {selectedChat?.messages.map((message) => (
-                        <ChatMessage
-                          key={message.id}
-                          message={message}
-                          onBook={() => { 
-                          }}
-                        />
-                      ))}
-                      <div ref={messagesEndRef} />
-                    </div>
+                    position: 'fixed',
+                    top: '3rem', // header height
+                    left: 0,
+                    right: 0,
+                    bottom: '4.5rem', // input height + bottom gap
+                    margin: '0 auto',
+                    width: '98%',
+                    maxWidth: '75vw',
+                    paddingLeft: '0.5rem',
+                    paddingRight: '0.5rem',
+                    paddingTop: '0.5rem',
+                    paddingBottom: '0.5rem',
+                    zIndex: 10,
+                  }}
+                >
+                  <div className="py-1.5 space-y-1">
+                    {selectedChat?.messages.map((message) => (
+                      <ChatMessage
+                        key={message.id}
+                        message={message}
+                        onBook={() => { }}
+                      />
+                    ))}
+                    <div ref={messagesEndRef} />
                   </div>
                 </div>
+                {/* Chat input fixed at bottom */}
                 <div
-                  className="bg-[var(--color-app-bg)] fixed bottom-3 left-0 w-full flex items-center justify-center"
+                  className="bg-[var(--color-app-bg)] fixed left-0 bottom-0 w-full flex items-center justify-center"
+                  style={{
+                    height: '4.5rem', // match the bottom offset above
+                    zIndex: 20,
+                  }}
                 >
-                  <div className="w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6">
+                  <div className="w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6 flex items-center h-full">
                     <ChatInput onSend={handleSendMessageHelper} />
                   </div>
                 </div>
