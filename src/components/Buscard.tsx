@@ -567,7 +567,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
 
       {/* Modal for Trip Review */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90" style={{ margin: 0, padding: 0 }}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-90" style={{ margin: 0, padding: 0 }}>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-11/12 max-w-md">
             {/* Header: Journey Details */}
             <div className="bg-[#0078d4] text-white rounded-t-lg p-4">
