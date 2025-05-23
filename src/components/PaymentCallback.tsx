@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-
-
 // Add interface for passenger items
 interface Passenger {
   name: string;
@@ -26,8 +24,8 @@ function PaymentCallback() {
     console.log('Payment callback params:', { sessionId, status });
     console.log('All search params:', Object.fromEntries([...searchParams]));
 
-    // Get access token
-    const accessToken = localStorage.getItem('access_token');
+    // Get access token - with fallback
+    const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || '';
 
     async function processPayment() {
       try {
@@ -37,9 +35,9 @@ function PaymentCallback() {
           throw new Error('Session ID is missing from the callback URL');
         }
 
-        // Get order_id from localStorage
-        const apiOrderId = localStorage.getItem('current_order_id');
-        console.log('API Order ID from localStorage:', apiOrderId);
+        // Get order_id from localStorage with fallback to sessionStorage
+        const apiOrderId = localStorage.getItem('current_order_id') || sessionStorage.getItem('current_order_id');
+        console.log('API Order ID from storage:', apiOrderId);
 
         if (!apiOrderId) {
           throw new Error('API Order ID not found. The booking may not have been completed properly.');
@@ -52,7 +50,9 @@ function PaymentCallback() {
         setProcessingStatus(
           `Confirming payment... ${retryCount > 0 ? `(Attempt ${retryCount + 1}/${MAX_RETRIES})` : ''}`
         );
-        const confirmResp = await fetch(
+        
+        // Use a timeout to ensure we don't get stuck if the fetch takes too long
+        const confirmPromise = fetch(
           `/api/tickets/${apiOrderId}/confirm_payment`,
           {
             method: 'GET',
@@ -62,6 +62,14 @@ function PaymentCallback() {
             },
           }
         );
+        
+        // Set a timeout for the fetch
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        );
+        
+        // Race between the fetch and the timeout
+        const confirmResp = await Promise.race([confirmPromise, timeoutPromise]) as Response;
 
         console.log('Confirm payment status:', confirmResp.status);
 
@@ -73,6 +81,7 @@ function PaymentCallback() {
 
         const confirmData = await confirmResp.json();
         console.log('Confirm payment data:', confirmData);
+        console.log('DEBUG: Backend confirm_payment JSON:', JSON.stringify(confirmData, null, 2));
 
         // Check payment status
         if (confirmData.status === 2) {
@@ -86,39 +95,25 @@ function PaymentCallback() {
             return;
           } else {
             // Max retries reached
-            localStorage.setItem(
-              'paymentStatus',
-              JSON.stringify({
-                sessionId,
-                summary: `⏳ Payment is still being processed. Please check your bookings later or contact support.`,
-              })
-            );
+            storePaymentData({
+              sessionId,
+              summary: `⏳ Payment is still being processed. Please check your bookings later or contact support.`,
+            });
             setProcessingStatus('Payment processing. Redirecting...');
             setTimeout(() => {
-              if (sessionId) {
-                navigate(`/c/${sessionId}`);
-              } else {
-                navigate('/');
-              }
+              redirectToChat(sessionId);
             }, 1500);
             return;
           }
         } else if (confirmData.status !== 1) {
           // Payment failed or unknown status
-          localStorage.setItem(
-            'paymentStatus',
-            JSON.stringify({
-              sessionId,
-              summary: `❌ Payment failed with status: ${confirmData.status}. Please try again or contact support.`,
-            })
-          );
+          storePaymentData({
+            sessionId,
+            summary: `❌ Payment failed with status: ${confirmData.status}. Please try again or contact support.`,
+          });
           setProcessingStatus('Payment failed. Redirecting...');
           setTimeout(() => {
-            if (sessionId) {
-              navigate(`/c/${sessionId}`);
-            } else {
-              navigate('/');
-            }
+            redirectToChat(sessionId);
           }, 1500);
           return;
         }
@@ -130,7 +125,9 @@ function PaymentCallback() {
 
           // 2. Get ticket details with the detailsId
           setProcessingStatus('Retrieving ticket details...');
-          const detailsResp = await fetch(
+          
+          // Set a timeout for the fetch
+          const detailsPromise = fetch(
             `/api/tickets/${detailsId}/ticket_details`,
             {
               method: 'GET',
@@ -140,32 +137,38 @@ function PaymentCallback() {
               },
             }
           );
+          
+          // Race between the fetch and the timeout
+          const detailsResp = await Promise.race([
+            detailsPromise, 
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Request timeout')), 10000))
+          ]) as Response;
 
           console.log('Ticket details status:', detailsResp.status);
 
           if (!detailsResp.ok) {
             const errorText = await detailsResp.text();
             console.error('Ticket details error:', errorText);
+            throw new Error(`Failed to retrieve ticket details: ${detailsResp.status}`);
           }
 
           const detailsData = await detailsResp.json();
           console.log('Ticket details data:', detailsData);
 
-          // 3. Format a clean summary
-          const ticket = detailsData.ticketData;
-          const passengers = detailsData.passengerData || [];
+          try {
+            // 3. Format and store ticket data
+            const ticket = detailsData.ticketData;
+            const passengers = detailsData.passengerData || [];
 
-          // Format times
-          const formatTime = (iso: string) =>
-            new Date(iso).toLocaleString('en-IN', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            });
+            // Format times
+            const formatTime = (iso: string) =>
+              new Date(iso).toLocaleString('en-IN', {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              });
 
-
-
-          // Create a more attractive summary with all booked seats
-          const summary = `
+            // Create a more attractive summary with all booked seats
+            const summary = `
 🎫 *TICKET CONFIRMED* 🎫
 
 🎉 *Congratulations ${(passengers[0]?.name) || 'Traveler'}!* 🎉
@@ -191,30 +194,54 @@ ${detailsData.passengerData?.map((pass: Passenger) =>
    Seat: *${pass.seat}*`
 ).join('\n') || '• No passenger details available'}
 
-
-
 Have a safe and comfortable journey! 🚀
 `;
 
+            // 4. Store structured data for ticket card display
+            storePaymentData({
+              sessionId, 
+              summary,
+              ticketData: {
+                ticket: {
+                  invoiceNumber: ticket.invoiceNumber,
+                  source: ticket.source,
+                  destination: ticket.destination,
+                  boardingPoint: ticket.boardingPoint,
+                  boardingTime: ticket.boardingTime,
+                  droppingPoint: ticket.droppingPoint,
+                  droppingTime: ticket.droppingTime,
+                  amount: ticket.totalAmount || ticket.amount
+                },
+                passengers: passengers.map((p: Passenger) => ({
+                  name: p.name,
+                  age: p.age,
+                  gender: p.gender,
+                  seat: p.seat
+                }))
+              }
+            });
 
-          // 4. Store for chat to pick up
-          localStorage.setItem('paymentStatus', JSON.stringify({ sessionId, summary }));
+            // Clean up the order ID from both storages
+            localStorage.removeItem('current_order_id');
+            sessionStorage.removeItem('current_order_id');
 
-          // Clean up the order ID as it's no longer needed
-          localStorage.removeItem('current_order_id');
-
-          setProcessingStatus('Payment successful! Redirecting to chat...');
+            setProcessingStatus('Payment successful! Redirecting to chat...');
+          } catch (parseError) {
+            console.error('Error parsing ticket details:', parseError);
+            // Store basic payment success even if details parsing fails
+            storePaymentData({
+              sessionId,
+              summary: `✅ Payment successful! Your booking has been confirmed but we couldn't retrieve the full details.`,
+            });
+          }
         } else {
           // Payment confirmed but ticket details missing
           console.error('Invalid confirm_payment response:', confirmData);
-          localStorage.setItem(
-            'paymentStatus',
-            JSON.stringify({
-              sessionId,
-              summary:
-                '❌ Booking failed: Could not retrieve ticket details. Your payment may still be processing.',
-            })
-          );
+          storePaymentData({
+            sessionId,
+            summary:
+              '❌ Booking failed: Could not retrieve ticket details. Your payment may still be processing.',
+          });
           setProcessingStatus('Warning: Ticket details not found. Redirecting...');
         }
       } catch (error: unknown) {
@@ -225,24 +252,49 @@ Have a safe and comfortable journey! 🚀
           errorMessage = error.message;
         }
 
-        localStorage.setItem(
-          'paymentStatus',
-          JSON.stringify({
-            sessionId,
-            summary: `❌ Booking failed: ${errorMessage}. If your payment was successful, please contact support.`,
-          })
-        );
+        storePaymentData({
+          sessionId,
+          summary: `❌ Booking failed: ${errorMessage}. If your payment was successful, please contact support.`,
+        });
         setProcessingStatus('Error processing payment. Redirecting...');
       }
 
       // Redirect to chat after short delay
       setTimeout(() => {
-        if (sessionId) {
-          navigate(`/c/${sessionId}`);
-        } else {
-          navigate('/');
-        }
+        redirectToChat(sessionId);
       }, 1500);
+    }
+
+    // Helper function to store data in both localStorage and sessionStorage
+    function storePaymentData(data: any) {
+      const jsonData = JSON.stringify(data);
+      try {
+        localStorage.setItem('paymentStatus', jsonData);
+      } catch (e) {
+        console.error('Error storing in localStorage:', e);
+      }
+      
+      try {
+        sessionStorage.setItem('paymentStatus', jsonData);
+      } catch (e) {
+        console.error('Error storing in sessionStorage:', e);
+      }
+      
+      // Also store in a cookie as a last resort for iOS WebKit
+      try {
+        document.cookie = `paymentStatus=${encodeURIComponent(jsonData)};path=/;max-age=300`;
+      } catch (e) {
+        console.error('Error storing in cookie:', e);
+      }
+    }
+    
+    // Helper function to navigate to chat
+    function redirectToChat(sessionId: string | null) {
+      if (sessionId) {
+        navigate(`/c/${sessionId}`);
+      } else {
+        navigate('/');
+      }
     }
 
     processPayment();

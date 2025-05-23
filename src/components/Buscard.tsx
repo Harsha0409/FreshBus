@@ -28,16 +28,32 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   const [showSkeleton, setShowSkeleton] = useState(true);
   
   // Boarding and dropping points
-  const [selectedBoarding, setSelectedBoarding] = useState<string | null>(
-    bus.recommended_boarding_points?.[0]?.name || 
-    bus.allBoardingPoints[0]?.boarding_point.name || 
-    null
-  );
-  const [selectedDropping, setSelectedDropping] = useState<string | null>(
-    bus.recommended_dropping_points?.[0]?.name || 
-    bus.allDroppingPoints[0]?.dropping_point.name || 
-    null
-  );
+const [selectedBoarding, setSelectedBoarding] = useState<string | null>(
+  (() => {
+    // Try to match recommended to allBoardingPoints
+    if (bus.recommended_boarding_points?.length) {
+      const match = bus.allBoardingPoints.find(bp =>
+        bp.boarding_point.name === bus.recommended_boarding_points?.[0]?.name
+      );
+      if (match) return match.boarding_point.name;
+    }
+    // Fallback to first allBoardingPoints
+    return bus.allBoardingPoints[0]?.boarding_point.name || null;
+  })()
+);
+const [selectedDropping, setSelectedDropping] = useState<string | null>(
+  (() => {
+    // Try to match recommended to allDroppingPoints
+    if (bus.recommended_dropping_points?.length) {
+      const match = bus.allDroppingPoints.find(dp =>
+        dp.dropping_point.name === bus.recommended_dropping_points?.[0]?.name
+      );
+      if (match) return match.dropping_point.name;
+    }
+    // Fallback to first allDroppingPoints
+    return bus.allDroppingPoints[0]?.dropping_point.name || null;
+  })()
+);
   const [dropdownOpen, setDropdownOpen] = useState({ boarding: false, dropping: false });
 
   // Backend passengers
@@ -220,6 +236,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       
       // Store in localStorage for future use
       localStorage.setItem('recentPassengers', JSON.stringify(allPassengers));
+      
       
       // Prepare payload according to backend expectations
       const payload = {
@@ -710,7 +727,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
             </div>
 
             {/* Body: Fare and Passenger Details */}
-            <div className="p-4 text-white">
+            <div className="p-4 text-black dark:text-white">
               <div className="flex justify-between">
                 {/* Left Side: Seat Details */}
                 <div className="space-y-1">
