@@ -13,6 +13,7 @@ import {
   Passenger,
   getSeatGender
 } from '../utils/busUtils';
+import ReactDOM from 'react-dom';
 
 interface BusCardProps {
   bus: BusWithCategory;
@@ -566,7 +567,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       </div>
 
       {/* Modal for Trip Review */}
-      {isModalOpen && (
+      {isModalOpen && ReactDOM.createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-90" style={{ margin: 0, padding: 0 }}>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-11/12 max-w-md">
             {/* Header: Journey Details */}
@@ -887,7 +888,8 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

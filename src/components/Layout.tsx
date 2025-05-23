@@ -197,7 +197,7 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
     <div className="h-[100dvh] flex flex-col bg-[var(--color-app-bg)] text-[var(--color-text)] overflow-hidden">
       <Toaster position="top-center" />
       <header
-        className="fixed top-0 left-0 w-full h-12 flex items-center justify-between px-2 sm:px-5 bg-[var(--color-header-bg)] whitespace-nowrap"
+        className="fixed top-0 left-0 w-full h-12 flex items-center justify-between px-2 sm:px-5 bg-[var(--color-header-bg)] whitespace-nowrap z-50"
       >
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
@@ -358,6 +358,7 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                   className="bg-[var(--color-app-bg)] fixed left-0 bottom-0 w-full flex items-center justify-center"
                   style={{
                     height: '4.5rem',
+
                   }}
                 >
                   <div className="w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6 flex items-center h-full">
