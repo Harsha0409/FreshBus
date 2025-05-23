@@ -710,7 +710,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
             </div>
 
             {/* Body: Fare and Passenger Details */}
-            <div className="p-4">
+            <div className="p-4 text-white">
               <div className="flex justify-between">
                 {/* Left Side: Seat Details */}
                 <div className="space-y-1">
