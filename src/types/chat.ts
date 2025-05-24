@@ -7,8 +7,9 @@ export interface Message {
   busRoutes?: Bus[];
   rawData?: any;
   isLoading?: boolean;
+  ticketData?: any; // You can type this more strictly if you have a TicketData interface
+  passengerData?: Passenger[];
 }
-
 export interface Chat {
   id: string;
   title: string;
@@ -103,10 +104,10 @@ export interface Bus {
 }
 
 export interface Passenger {
-  id: number;
   name: string;
+  age: number | string;
   gender: string;
-  age: number;
+  seat: string | number;
 }
 
 // If you want to type the full backend response:

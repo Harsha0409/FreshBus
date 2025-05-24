@@ -22,7 +22,7 @@ export default defineConfig({
     open: false,
     proxy: {
       '/api': {
-        target: 'https://ai-api.freshbus.com/',
+        target: 'https://ai-api.freshbus.com',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''), // Remove the /api prefix
@@ -48,9 +48,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           react: ['react', 'react-dom'],
-          // Add more libraries as needed, e.g.:
-          // lodash: ['lodash'],
-          // chartjs: ['chart.js'],
         }
       }
     }

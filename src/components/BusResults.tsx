@@ -3,7 +3,7 @@ import BusCard from './Buscard';
 import { Bus, RecommendedPoint, BoardingPoint, DroppingPoint, RecommendedSeats, GenderAssignments, Passenger, BusQueryResponse } from '../types/chat';
 import { flattenBusesByCategory } from '../utils/busUtils';
 
-interface BusResultsProps {
+interface BusResultsProps { 
   searchQuery?: Bus[] | BusQueryResponse | any;
   onBook: (busId: number) => void;
 }

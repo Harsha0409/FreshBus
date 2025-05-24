@@ -286,12 +286,8 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
       }
 
       toast.success('Redirecting to payment portal...');
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.location.href = data.payment_url;
-      } else {
-        window.location.href = data.payment_url;
-      }
+window.location.href = data.payment_url;
+
     } catch (error: any) {
       toast.error(error.message || 'An error occurred during payment.');
     } finally {

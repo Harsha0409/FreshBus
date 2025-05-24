@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 import { Message } from '../types/chat';
 import { useTheme } from '../context/ThemeContext';
 import BusResults from './BusResults';
@@ -31,6 +32,10 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
       if (timer) clearTimeout(timer);
     };
   }, [isLoading, isUser]);
+
+  // In your chat page/component (e.g., after redirect from payment)
+// Removed paymentStatus effect and addMessage usage because addMessage is not defined in this component.
+// If you need to handle paymentStatus, move this logic to a parent component where addMessage is available.
 
   // Single state for content - either bus data or text
   const [content, setContent] = useState<{
@@ -238,17 +243,28 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
         </div>
 
         {/* Content Rendering - Bus Results or Text */}
-        {content.type === 'bus' || 
-         message.content.includes('"tripID"') || 
-         message.content.includes('"recommendations"') ? (
-          <div className="mt-2 w-full">
-            <BusResults searchQuery={content.type === 'bus' ? content.data : message.content} onBook={onBook} />
-          </div>
-        ) : (
-          <div className="prose dark:prose-invert max-w-none mt-1 text-xs sm:text-sm">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          </div>
-        )}
+{content.type === 'bus' ||
+ message.content.includes('"tripID"') ||
+ message.content.includes('"recommendations"') ? (
+  <div className="mt-2 w-full">
+    <BusResults searchQuery={content.type === 'bus' ? content.data : message.content} onBook={onBook} />
+  </div>
+) : (
+  <div className="prose dark:prose-invert max-w-none mt-1 text-xs sm:text-sm">
+<ReactMarkdown
+  remarkPlugins={[remarkBreaks]}
+  components={{
+    a: (props) => (
+      <a {...props} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">
+        {props.children}
+      </a>
+    ),
+  }}
+>
+  {message.content}
+</ReactMarkdown>
+  </div>
+)}
       </div>
 
       {/* User Icon for User Messages */}

@@ -168,36 +168,29 @@ function PaymentCallback() {
               });
 
             // Create a more attractive summary with all booked seats
-            const summary = `
-🎫 *TICKET CONFIRMED* 🎫
+const summary = `
+Hurray! Your FreshBus Ticket is confirmed!
+Dear Customer,
+We’re delighted to have you travel with us!
+✅ Bus Type: ${ticket.vehicleType || 'N/A'}
+✅ Booking ID: ${ticket.invoiceNumber}
+✅ Route: ${ticket.source} - ${ticket.destination}
+✅ Reporting:  ${formatTime(ticket.boardingTime)}
+✅ Bus Departs at: ${formatTime(ticket.boardingTime)}
+✅ Seats: ${passengers.map((p: Passenger) => `${p.seat}(${p.gender[0]})`).join(', ')}
 
-🎉 *Congratulations ${(passengers[0]?.name) || 'Traveler'}!* 🎉
-Your bus booking has been successfully confirmed.
 
-📋 *BOOKING DETAILS*
-------------------------
-🔢 *PNR*: ${ticket.invoiceNumber}
-🚌 *Route*: ${ticket.source} ➡️ ${ticket.destination}
-⏰ *Journey Date*: ${new Date(ticket.boardingTime).toLocaleDateString('en-IN', {dateStyle: 'full'})}
-
-🚏 *BOARDING*
-${ticket.boardingPoint}
-${formatTime(ticket.boardingTime)}
-
-🏁 *DESTINATION*
-${ticket.droppingPoint}
-${formatTime(ticket.droppingTime)}
-
-👥 *PASSENGER DETAILS*
-${detailsData.passengerData?.map((pass: Passenger) => 
-  `• *${pass.name}* (${pass.age}, ${pass.gender})
-   Seat: *${pass.seat}*`
-).join('\n') || '• No passenger details available'}
-
-Have a safe and comfortable journey! 🚀
-`;
-
-            // 4. Store structured data for ticket card display
+Boarding Point: ${ticket.boardingPoint}
+Landmark: ${ticket.boardingLandmark || 'N/A'}
+[Boarding Point Location](${ticket.boardingPointUrl || 'N/A'})
+Dropping Point: ${ticket.droppingPoint}
+Landmark: ${ticket.droppingLandmark || 'N/A'}
+[Dropping Point Location](${ticket.droppingPointUrl || 'N/A'})
+[Detailed Freshbus Policy](https://www.freshbus.com/terms-and-conditions)
+24/7 Helpline:
+For further assistance, contact us on 7075511729
+Thank you for choosing FreshBus. Stay fresh!
+`;            // 4. Store structured data for ticket card display
             storePaymentData({
               sessionId, 
               summary,

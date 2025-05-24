@@ -28,6 +28,7 @@
     "react-router-dom": "^7.6.0",
     "react-toastify": "^11.0.5",
     "regenerator-runtime": "^0.14.1",
+    "remark-breaks": "^4.0.0",
     "tailwind-merge": "^3.3.0",
     "zod": "^3.24.4"
   },
