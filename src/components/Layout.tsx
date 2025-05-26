@@ -62,7 +62,9 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                     {
                       id: `payment-confirmation-${Date.now()}`,
                       role: 'assistant',
-                      content: paymentStatus.summary,
+                      content: paymentStatus.ticketData
+                        ? { summary: paymentStatus.summary, ticketData: paymentStatus.ticketData, passengerData: paymentStatus.ticketData.passengers, billItems: paymentStatus.billItems }
+                        : paymentStatus.summary,
                       timestamp: new Date()
                     }
                   ],
@@ -143,7 +145,9 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                     {
                       id: `payment-confirmation-${Date.now()}`,
                       role: 'assistant',
-                      content: paymentStatus.summary,
+                      content: paymentStatus.ticketData
+                        ? { summary: paymentStatus.summary, ticketData: paymentStatus.ticketData, passengerData: paymentStatus.ticketData.passengers, billItems: paymentStatus.billItems }
+                        : { summary: paymentStatus.summary },
                       timestamp: new Date()
                     }
                   ],

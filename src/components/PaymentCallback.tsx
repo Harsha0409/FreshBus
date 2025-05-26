@@ -168,7 +168,7 @@ function PaymentCallback() {
               });
 
             // Create a more attractive summary with all booked seats
-const summary = `
+            const summary = `
 Hurray! Your FreshBus Ticket is confirmed!
 Dear Customer,
 We’re delighted to have you travel with us!
@@ -192,26 +192,24 @@ For further assistance, contact us on 7075511729
 Thank you for choosing FreshBus. Stay fresh!
 `;            // 4. Store structured data for ticket card display
             storePaymentData({
-              sessionId, 
+              sessionId,
               summary,
               ticketData: {
-                ticket: {
-                  invoiceNumber: ticket.invoiceNumber,
-                  source: ticket.source,
-                  destination: ticket.destination,
-                  boardingPoint: ticket.boardingPoint,
-                  boardingTime: ticket.boardingTime,
-                  droppingPoint: ticket.droppingPoint,
-                  droppingTime: ticket.droppingTime,
-                  amount: ticket.totalAmount || ticket.amount
-                },
-                passengers: passengers.map((p: Passenger) => ({
-                  name: p.name,
-                  age: p.age,
-                  gender: p.gender,
-                  seat: p.seat
-                }))
-              }
+                invoiceNumber: ticket.invoiceNumber,
+                source: ticket.source,
+                destination: ticket.destination,
+                boardingPoint: ticket.boardingPoint,
+                boardingTime: ticket.boardingTime,
+                droppingPoint: ticket.droppingPoint,
+                droppingTime: ticket.droppingTime,
+                amount: ticket.totalAmount || ticket.amount
+              },
+              passengerData: passengers.map((p: Passenger) => ({
+                name: p.name,
+                age: p.age,
+                gender: p.gender,
+                seat: p.seat
+              }))
             });
 
             // Clean up the order ID from both storages

@@ -105,8 +105,8 @@ export async function handleSendMessage(
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-      const responseText = await response.text();
-    let assistantContent = '';
+    const responseText = await response.text();
+    let assistantContent: any = '';
 
     try {
       // Try to parse as JSON
@@ -117,14 +117,18 @@ export async function handleSendMessage(
       } else if (
         parsed &&
         typeof parsed === 'object' &&
+        'recommendations' in parsed &&
+        Array.isArray(parsed.recommendations)
+      ) {
+        // Store the parsed object directly so ChatMessage can render bus cards
+        assistantContent = parsed;
+      } else if (
+        parsed &&
+        typeof parsed === 'object' &&
         'reply' in parsed &&
         typeof parsed.reply === 'string'
       ) {
         assistantContent = parsed.reply;
-      } else if (parsed && typeof parsed === 'object') {
-        assistantContent = Object.entries(parsed)
-          .map(([key, value]) => `${key}: ${value}`)
-          .join(', ');
       } else {
         assistantContent = '';
       }
@@ -153,7 +157,8 @@ export async function handleSendMessage(
             }
           : chat
       )
-    );  } catch (error: any) {
+    );
+  } catch (error: any) {
     setChats((prevChats) =>
       prevChats.map((chat) =>
         chat.id === selectedChatId
