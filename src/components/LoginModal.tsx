@@ -1,6 +1,7 @@
 import { useLoginModal } from '../context/loginModalContext';
 import LoginForm from './LoginForm';
 import { useTheme } from '../context/ThemeContext';
+import ReactDOM from 'react-dom';
 
 export default function LoginModal() {
     const { isOpen, onClose } = useLoginModal();
@@ -8,16 +9,10 @@ export default function LoginModal() {
 
     if (!isOpen) return null;
 
-    return (
-        <>
-            {/* Overlay */}
-            <div
-                className="fixed inset-0 bg-black bg-opacity-50 z-[100]"
-                onClick={onClose}
-            />
-
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm" style={{ margin: 0, padding: 0 }} onClick={onClose}>
             {/* Modal */}
-            <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
+            <div className="z-[10000] flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
                 <div className={`rounded-lg shadow-xl w-full max-w-md relative ${
                     theme === 'dark' 
                         ? 'bg-[#121212] border border-[#1e1e1e]' 
@@ -57,6 +52,7 @@ export default function LoginModal() {
                     </div>
                 </div>
             </div>
-        </>
+        </div>,
+        document.body
     );
 }

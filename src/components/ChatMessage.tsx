@@ -5,13 +5,16 @@ import { Message } from '../types/chat';
 import { useTheme } from '../context/ThemeContext';
 import BusResults from './BusResults';
 import { Sparkles } from 'lucide-react';
+import CancellationCard from './cancellationCard';
 
 interface ChatMessageProps {
   message: Message;
   onBook: (busId: number) => void;
+  selectedChatId?: string;
+  setChats?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
-export function ChatMessage({ message, onBook }: ChatMessageProps) {
+export function ChatMessage({ message, onBook, selectedChatId, setChats }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const { theme } = useTheme();
   const isLoading = message.isLoading || false;
@@ -22,19 +25,14 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
   let isMalformedRecommendationString = false;
 
   // Try to parse if it's a string and looks like JSON
-  if (
-    typeof message.content === 'string'
-  ) {
+  if (typeof message.content === 'string') {
     try {
-      // Try to parse as JSON
       parsedContent = JSON.parse(message.content);
     } catch {
-      // If it's not valid JSON, fallback to original string
       parsedContent = message.content;
-      // Detect malformed [object Object] string
       if (
-        message.content.includes('recommendations: [object Object]')
-        || message.content.includes('[object Object]')
+        message.content.includes('recommendations: [object Object]') ||
+        message.content.includes('[object Object]')
       ) {
         isMalformedRecommendationString = true;
       }
@@ -62,6 +60,72 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
       if (timer) clearTimeout(timer);
     };
   }, [isLoading, isUser]);
+
+  // --- CANCELLATION SUCCESS MESSAGE RENDERING ---
+  if (
+    !isUser &&
+    typeof parsedContent === 'object' &&
+    parsedContent !== null &&
+    parsedContent.status === true &&
+    typeof parsedContent.message === 'string'
+  ) {
+    return (
+      <div className="flex justify-start items-start py-1 mb-4 gap-1">
+        <div className="flex-1 ml-2 text-left">
+          <div className="flex items-center gap-1 justify-between">
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
+            </span>
+          </div>
+          <div className="prose dark:prose-invert max-w-none mt-1 text-xs sm:text-sm">
+            <ReactMarkdown
+              remarkPlugins={[remarkBreaks]}
+              components={{
+                a: (props) => (
+                  <a {...props} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">
+                    {props.children}
+                  </a>
+                ),
+              }}
+            >
+              {parsedContent.message}
+            </ReactMarkdown>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- CANCELLATION CARD RENDERING ---
+  if (
+    !isUser &&
+    typeof parsedContent === 'object' &&
+    parsedContent !== null &&
+    (parsedContent.success === true || parsedContent.data?.upcoming_travels)
+  ) {
+    const cancellationData = parsedContent.success === true ? 
+      parsedContent : 
+      { success: true, data: { upcoming_travels: parsedContent } };
+
+    return (
+      <div className="flex justify-start items-start py-1 mb-4 gap-1">
+        <div className="flex-1 ml-2 text-left">
+          <div className="flex items-center gap-1 justify-between">
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
+            </span>
+          </div>
+          <div className="mt-2 w-full">
+            <CancellationCard 
+              data={cancellationData} 
+              selectedChatId={selectedChatId}
+              setChats={setChats}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // --- IMMEDIATE BUS CARD RENDERING ---
   if (
@@ -249,7 +313,7 @@ export function ChatMessage({ message, onBook }: ChatMessageProps) {
           <span className="font-medium text-gray-900 dark:text-gray-100">
             {!isUser && (
               <>
-                <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
+                <span className="text-[#1765f3] dark:text-[#fbe822]">SPATH</span>.AI
               </>
             )}
           </span>

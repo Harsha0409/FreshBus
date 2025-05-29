@@ -17,15 +17,41 @@ function PaymentCallback() {
   const MAX_RETRIES = 5; // Maximum number of retries for pending payments
 
   useEffect(() => {
-    const sessionId = searchParams.get('session_id');
-    const status = searchParams.get('status');
+    const sessionId = localStorage.getItem('sessionId') || searchParams.get('session_id');
+    
+    // Parse user object from localStorage
+    let userId = '';
+    try {
+      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (userStr) {
+        const userObj = JSON.parse(userStr);
+        userId = userObj.id?.toString() || '';
+        console.log('Parsed user ID:', userId);
+      }
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
 
-    // For debugging
-    console.log('Payment callback params:', { sessionId, status });
-    console.log('All search params:', Object.fromEntries([...searchParams]));
+    // Get access token with validation
+    const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
+    
+    // Validate required data
+    if (!accessToken) {
+      console.error('Access token not found');
+      setProcessingStatus('Authentication error. Please login again.');
+      return;
+    }
 
-    // Get access token - with fallback
-    const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || '';
+    if (!sessionId) {
+      console.error('Session ID not found');
+      setProcessingStatus('Session error. Please try again.');
+      return;
+    }
+
+    // Debug logs for token and session
+    console.log('Access Token available:', !!accessToken);
+    console.log('Session ID:', sessionId);
+    console.log('User Details:', { userId });
 
     async function processPayment() {
       try {
@@ -33,6 +59,10 @@ function PaymentCallback() {
 
         if (!sessionId) {
           throw new Error('Session ID is missing from the callback URL');
+        }
+
+        if (!userId) {
+          console.warn('User ID not found in storage');
         }
 
         // Get order_id from localStorage with fallback to sessionStorage
@@ -45,6 +75,7 @@ function PaymentCallback() {
 
         // For debugging
         console.log('Using API Order ID for confirmation:', apiOrderId);
+        console.log('Sending payment confirmation with:', { userId, sessionId, apiOrderId });
 
         // 1. Confirm payment
         setProcessingStatus(
@@ -59,6 +90,8 @@ function PaymentCallback() {
             headers: {
               Authorization: `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
+              'X-User-ID': userId,
+              'X-Session-ID': sessionId
             },
           }
         );
@@ -97,6 +130,7 @@ function PaymentCallback() {
             // Max retries reached
             storePaymentData({
               sessionId,
+              userId,
               summary: `⏳ Payment is still being processed. Please check your bookings later or contact support.`,
             });
             setProcessingStatus('Payment processing. Redirecting...');
@@ -109,6 +143,7 @@ function PaymentCallback() {
           // Payment failed or unknown status
           storePaymentData({
             sessionId,
+            userId,
             summary: `❌ Payment failed with status: ${confirmData.status}. Please try again or contact support.`,
           });
           setProcessingStatus('Payment failed. Redirecting...');
@@ -134,6 +169,8 @@ function PaymentCallback() {
               headers: {
                 Authorization: `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
+                'X-User-ID': userId,
+                'X-Session-ID': sessionId
               },
             }
           );
@@ -171,13 +208,14 @@ function PaymentCallback() {
             const summary = `
 Hurray! Your FreshBus Ticket is confirmed!
 Dear Customer,
-We’re delighted to have you travel with us!
+We're delighted to have you travel with us!
 ✅ Bus Type: ${ticket.vehicleType || 'N/A'}
 ✅ Booking ID: ${ticket.invoiceNumber}
 ✅ Route: ${ticket.source} - ${ticket.destination}
 ✅ Reporting:  ${formatTime(ticket.boardingTime)}
 ✅ Bus Departs at: ${formatTime(ticket.boardingTime)}
 ✅ Seats: ${passengers.map((p: Passenger) => `${p.seat}(${p.gender[0]})`).join(', ')}
+✅ Final Amount Paid: ${detailsData.billItems.find((item: { label: string; value: string | number }) => item.label === 'Final Fare')?.value || 'N/A'}
 
 
 Boarding Point: ${ticket.boardingPoint}
@@ -190,9 +228,11 @@ Landmark: ${ticket.droppingLandmark || 'N/A'}
 24/7 Helpline:
 For further assistance, contact us on 7075511729
 Thank you for choosing FreshBus. Stay fresh!
-`;            // 4. Store structured data for ticket card display
+`;
+            // 4. Store structured data for ticket card display
             storePaymentData({
               sessionId,
+              userId,
               summary,
               ticketData: {
                 invoiceNumber: ticket.invoiceNumber,
@@ -222,6 +262,7 @@ Thank you for choosing FreshBus. Stay fresh!
             // Store basic payment success even if details parsing fails
             storePaymentData({
               sessionId,
+              userId,
               summary: `✅ Payment successful! Your booking has been confirmed but we couldn't retrieve the full details.`,
             });
           }
@@ -230,6 +271,7 @@ Thank you for choosing FreshBus. Stay fresh!
           console.error('Invalid confirm_payment response:', confirmData);
           storePaymentData({
             sessionId,
+            userId,
             summary:
               '❌ Booking failed: Could not retrieve ticket details. Your payment may still be processing.',
           });
@@ -245,6 +287,7 @@ Thank you for choosing FreshBus. Stay fresh!
 
         storePaymentData({
           sessionId,
+          userId,
           summary: `❌ Booking failed: ${errorMessage}. If your payment was successful, please contact support.`,
         });
         setProcessingStatus('Error processing payment. Redirecting...');
@@ -259,6 +302,7 @@ Thank you for choosing FreshBus. Stay fresh!
     // Helper function to store data in both localStorage and sessionStorage
     function storePaymentData(data: any) {
       const jsonData = JSON.stringify(data);
+      console.log('Storing payment data:', data);
       try {
         localStorage.setItem('paymentStatus', jsonData);
       } catch (e) {
@@ -288,9 +332,11 @@ Thank you for choosing FreshBus. Stay fresh!
       }
     }
 
-    processPayment();
-    // eslint-disable-next-line
-  }, [navigate, retryCount]);
+    processPayment().catch(error => {
+      console.error('Payment process failed:', error);
+      setProcessingStatus('Payment failed. Please try again.');
+    });
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900 p-4">

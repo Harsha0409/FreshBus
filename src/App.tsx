@@ -8,6 +8,7 @@ import LoginModal from './components/LoginModal';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Chat } from './types/chat';
+import { useAuth } from './hooks/useAuth';
 
 const mockChats: Chat[] = [
   {
@@ -23,19 +24,27 @@ function App() {
 
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <LoginModalProvider>
-          <Routes>
-            <Route path="/" element={<Layout chats={chats} setChats={setChats} />} />
-            <Route path="/c/:sessionId" element={<Layout chats={chats} setChats={setChats} />} />
-            <Route path="/dashboard" element={<Layout chats={chats} setChats={setChats} />} />
-            <Route path="/payment/callback" element={<PaymentCallback />} />
-          </Routes>
-          <LoginModal />
-          <ToastContainer position="top-right" autoClose={2000} />
-        </LoginModalProvider>
-      </ThemeProvider>
+      <AppContent chats={chats} setChats={setChats} />
     </BrowserRouter>
+  );
+}
+
+function AppContent({ chats, setChats }: { chats: Chat[]; setChats: React.Dispatch<React.SetStateAction<Chat[]>> }) {
+  const isAuthenticated = useAuth(); // Now useAuth is used within Router context
+
+  return (
+    <ThemeProvider>
+      <LoginModalProvider initialOpen={!isAuthenticated}>
+        <Routes>
+          <Route path="/" element={<Layout chats={chats} setChats={setChats} />} />
+          <Route path="/c/:sessionId" element={<Layout chats={chats} setChats={setChats} />} />
+          <Route path="/dashboard" element={<Layout chats={chats} setChats={setChats} />} />
+          <Route path="/payment/callback" element={<PaymentCallback />} />
+        </Routes>
+        <LoginModal />
+        <ToastContainer position="top-right" autoClose={2000} />
+      </LoginModalProvider>
+    </ThemeProvider>
   );
 }
 

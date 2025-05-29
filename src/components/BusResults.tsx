@@ -85,7 +85,25 @@ const BusResults: React.FC<BusResultsProps> = ({ searchQuery, onBook }) => {
   }, [busData, passengersData]);
 
   if (loading) {
-    return <p className="text-center text-gray-500">Loading buses...</p>;
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-2">
+        {[1, 2].map((key) => (
+          <div key={key} className="rounded-lg shadow-md p-4 w-full bg-[#0078d4] relative overflow-hidden">
+            <div className="animate-pulse">
+              <div className="flex items-center justify-between mb-4">
+                <div className="h-16 w-1/4 bg-gray-200/20 rounded"></div>
+                <div className="h-16 w-1/3 bg-gray-200/20 rounded mx-4"></div>
+                <div className="h-16 w-1/4 bg-gray-200/20 rounded"></div>
+              </div>
+              <div className="flex justify-between">
+                <div className="h-20 w-3/5 bg-gray-200/20 rounded mr-2"></div>
+                <div className="h-20 w-2/5 bg-gray-200/20 rounded"></div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (isEmptyResponse) {

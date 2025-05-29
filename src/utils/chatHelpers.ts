@@ -86,20 +86,77 @@ export async function handleSendMessage(
 
   // --- Added: Send query to backend ---
   try {
-    const session_id = localStorage.getItem('sessionId') || undefined;
+    const session_id = localStorage.getItem('sessionId');
+    const accessToken = localStorage.getItem('access_token');
+    const refreshToken = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('refresh_token='))
+      ?.split('=')?.[1];
+
+    // Validate tokens before making the request
+    if (!accessToken) {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        // Try to refresh the token
+        const refreshed = await authService.refreshToken();
+        if (!refreshed) {
+          toast.error("Session expired. Please login again.");
+          authService.clearAuth(); // Clear stored auth data
+          return;
+        }
+      } else {
+        toast.error("Please login to continue");
+        return;
+      }
+    }
+
     const body = {
       query: content,
       id: Number(user.id),
       name: user.name || null,
       mobile: user.mobile,
-      ...(session_id && { session_id }),
+      session_id: session_id || undefined
     };
+
+    const headers = new Headers({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('access_token')}`, // Get fresh token
+      'X-User-ID': user.id?.toString() || '',
+      'X-Session-ID': session_id || ''
+    });
+
+    if (refreshToken) {
+      headers.append('X-Refresh-Token', refreshToken);
+    }
 
     const response = await fetch('/api/query', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
+      credentials: 'include' // Important: include cookies in request
     });
+
+    if (response.status === 401) {
+      // Try to refresh the token
+      const refreshed = await authService.refreshToken();
+      if (!refreshed) {
+        toast.error("Session expired. Please login again.");
+        authService.clearAuth(); // Clear stored auth data
+        return;
+      }
+      // Retry the request with new token
+      return handleSendMessage(content, selectedChatId, setChats, locationPathname, createNewSessionHelper);
+    }
+
+    // Handle authentication errors
+    if (response.status === 401) {
+      const errorData = await response.json();
+      toast.error(errorData.message || "Session expired. Please login again.");
+      // Clear invalid tokens
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      return;
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
@@ -112,15 +169,15 @@ export async function handleSendMessage(
       // Try to parse as JSON
       const parsed = JSON.parse(responseText);
 
-      if (typeof parsed === 'string') {
-        assistantContent = parsed;
+      if (parsed?.data?.upcoming_travels || parsed?.upcoming_travels) {
+        // This is cancellation data - preserve the structure
+        assistantContent = parsed.data ? parsed : { data: parsed };
       } else if (
         parsed &&
         typeof parsed === 'object' &&
         'recommendations' in parsed &&
         Array.isArray(parsed.recommendations)
       ) {
-        // Store the parsed object directly so ChatMessage can render bus cards
         assistantContent = parsed;
       } else if (
         parsed &&
@@ -130,10 +187,9 @@ export async function handleSendMessage(
       ) {
         assistantContent = parsed.reply;
       } else {
-        assistantContent = '';
+        assistantContent = responseText;
       }
     } catch {
-      // Not JSON, treat as plain text
       assistantContent = responseText;
     }
 
@@ -245,13 +301,29 @@ export async function loadConversation(
 
     const formattedMessages: Message[] = historyData.history
       .filter((msg: any) => msg.role !== 'meta')
-      .map((msg: any, index: number) => ({
-        id: `${conversationId}-${index}`,
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-        timestamp: new Date(),
-        isLoading: false
-      }));
+      .map((msg: any, index: number) => {
+        let content = msg.content;
+        
+        // Try to parse JSON content if it's a string
+        if (typeof content === 'string') {
+          try {
+            const parsed = JSON.parse(content);
+            if (parsed.data?.upcoming_travels || parsed.upcoming_travels) {
+              content = parsed; // Use the parsed object directly
+            }
+          } catch {
+            // Not JSON, keep as string
+          }
+        }
+        
+        return {
+          id: `${conversationId}-${index}`,
+          role: msg.role as 'user' | 'assistant',
+          content: content,
+          timestamp: new Date(),
+          isLoading: false
+        };
+      });
 
     const loadedChat: Chat = {
       id: conversationId,
@@ -282,4 +354,27 @@ export async function loadConversation(
   } catch (error) {
     toast.error('Failed to load conversation');
   }
+}
+
+export function addAIMessageToChat(
+  content: string,
+  selectedChatId: string,
+  setChats: React.Dispatch<React.SetStateAction<Chat[]>>
+) {
+  const newMessageId = Date.now().toString();
+
+  const aiMessage: Message = {
+    id: newMessageId,
+    content,
+    role: 'assistant',
+    timestamp: new Date(),
+  };
+
+  setChats((prevChats) =>
+    prevChats.map((chat) =>
+      chat.id === selectedChatId
+        ? { ...chat, messages: [...chat.messages, aiMessage], lastUpdated: new Date() }
+        : chat
+    )
+  );
 }

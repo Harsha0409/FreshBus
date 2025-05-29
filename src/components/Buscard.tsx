@@ -428,7 +428,7 @@ window.location.href = data.payment_url;
   // Render skeleton during loading
   if (showSkeleton) {
     return (
-      <div className="rounded-lg shadow-md p-4 w-full max-w-md bg-[#0078d4] relative overflow-hidden">
+      <div className="rounded-lg shadow-md p-4 w-full bg-[#0078d4] relative overflow-hidden">
         <style>
           {`
           @keyframes blurPulse {

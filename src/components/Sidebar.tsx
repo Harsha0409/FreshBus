@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useRef } from 'react';
 import { Plus, X, MoreVertical, Trash2 } from 'lucide-react';
 import { Chat } from '../types/chat';
 import { Logo } from './Logo';
@@ -27,6 +28,23 @@ export function Sidebar({
   const [isLoading, setIsLoading] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 const [showDeleteFor, setShowDeleteFor] = useState<string | null>(null);
+
+
+const sidebarRef = useRef<HTMLDivElement>(null);
+
+
+useEffect(() => {
+  function handleClickOutside(event: MouseEvent) {
+    if (isOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+      onClose();
+    }
+  }
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, [isOpen, onClose]);
 
   // Add delete conversation handler
   const handleDeleteConversation = async (sessionId: string) => {
@@ -127,6 +145,7 @@ const [showDeleteFor, setShowDeleteFor] = useState<string | null>(null);
 
   return (
     <aside
+    ref={sidebarRef}
       className={`fixed top-0 left-0 h-full w-64 bg-[var(--color-sidebar-bg)] border-r border-gray-200 dark:border-dark-border ${
         isOpen ? 'translate-x-0 shadow-xl opacity-100' : '-translate-x-full opacity-0'
       } z-50 transition-transform duration-300`}
@@ -179,7 +198,7 @@ const [showDeleteFor, setShowDeleteFor] = useState<string | null>(null);
                       : 'hover:bg-gray-100 dark:hover:bg-dark-hover'
                     }`}
                 >
-<button
+                  <button
                     onClick={() => handleLoadConversation(chat.session_id)}
                     className="w-full text-left"
                   >

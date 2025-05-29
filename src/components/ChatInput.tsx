@@ -61,7 +61,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   };
 
   const sendToGroq = async () => {
-    const groqApiKey = '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';
+    const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
     const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
     const formData = new FormData();
     formData.append('file', audioBlob, 'recording.webm');
