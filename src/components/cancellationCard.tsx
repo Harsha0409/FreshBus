@@ -20,14 +20,14 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
   const [showPolicyModal, setShowPolicyModal] = useState(false)
   const [showRefundPolicies, setShowRefundPolicies] = useState(false)
   const [selectedSeatsForCancellation, setSelectedSeatsForCancellation] = useState<Set<string>>(new Set())
-  const [selectedRefundMethod, setSelectedRefundMethod] = useState<'cash' | 'coins'>('cash')
+  const [selectedRefundMethod, setSelectedRefundMethod] = useState<'cash' | 'coins'>('coins')
   const [isProcessing, setIsProcessing] = useState(false)
 
   const handleTravelSelect = (travel: UpcomingTravel) => {
     setSelectedTravel(travel)
     setShowPolicyModal(true)
     setShowRefundPolicies(false)
-    setSelectedRefundMethod('cash')
+    setSelectedRefundMethod('coins')
     
     // If single ticket, select all seats by default, otherwise start with none
     if (travel.policy.cancelSeatResponseDto.length === 1) {

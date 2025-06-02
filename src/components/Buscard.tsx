@@ -333,42 +333,47 @@ window.location.href = data.payment_url;
     const seatGender = getSeatGender(bus, selectedSeats[currentSeatIndex]);
     const gender = seatGender === 'female' ? 'Female' : backendPassenger.gender;
     
-    setCurrentPassenger({
+    const selectedPassenger = {
       name: backendPassenger.name,
       age: backendPassenger.age,
       gender
+    };
+    
+    // Immediately add the passenger to the list
+    setPassengerDetails(prevDetails => {
+      const updatedDetails = [...prevDetails];
+      if (editingIndex !== null) {
+        updatedDetails[editingIndex] = selectedPassenger;
+        setEditingIndex(null);
+      } else {
+        updatedDetails[currentSeatIndex] = selectedPassenger;
+      }
+      return updatedDetails;
     });
+    
+    // Move to next passenger if any
+    const nextIndex = editingIndex !== null 
+      ? editingIndex + 1
+      : currentSeatIndex + 1;
+      
+    if (nextIndex < selectedSeats.length) {
+      setCurrentSeatIndex(nextIndex);
+      setCurrentPassenger(getInitialPassenger(nextIndex));
+    } else {
+      // Reset to empty form with default values for a clean form
+      setCurrentPassenger({ name: '', age: undefined, gender: 'Male' });
+    }
   };
 
   // Helper function to determine the text for the add passenger button
-  const getAddPassengerButtonText = () => {
-    const filledPassengers = passengerDetails.filter(p => p.name && p.age !== undefined && p.gender);
-    const remainingCount = selectedSeats.length - filledPassengers.length;
-    
-    if (editingIndex !== null) {
-      return 'Update Passenger';
-    } 
-    
-    if (remainingCount === 0) {
-      return 'All passengers updated';
-    }
-    
-    if (selectedSeats.length === 1) {
-      return 'Add Passenger';
-    }
-    
-    if (remainingCount === 1) {
-      return 'Add Passenger';
-    }
-    
-    return `Add Passenger +${remainingCount - 1} more`;
-  };
 
   // Check if all passengers are complete and valid
   const getFilledPassengersCount = () => 
     passengerDetails.filter(p => p.name && p.age !== undefined && p.gender).length;
   
   const areAllPassengersValid = getFilledPassengersCount() === selectedSeats.length;
+
+  // Helper function to check if there are available passenger suggestions
 
   // Render passenger suggestions from backend
   const renderPassengerSuggestions = () => {
@@ -409,15 +414,15 @@ window.location.href = data.payment_url;
     
     return (
       <div className="mt-2">
-        <p className="text-xs text-gray-500 dark:text-gray-400">Quick select:</p>
-        <div className="flex flex-wrap gap-1 mt-1">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select from previous passengers:</p>
+        <div className="flex flex-wrap gap-2 mt-1">
           {filteredPassengers.map((passenger, idx) => (
             <button
               key={idx}
-              className="px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-800/40"
+              className="px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-800/40 border border-blue-200 dark:border-blue-700 transition-colors font-medium"
               onClick={() => handleSelectPassenger(passenger)}
             >
-              {passenger.name} ({passenger.age})
+              {passenger.name} ({passenger.age}, {passenger.gender})
             </button>
           ))}
         </div>
@@ -825,7 +830,7 @@ window.location.href = data.payment_url;
                       value={currentPassenger.name || ''}
                       onChange={(e) => setCurrentPassenger({ ...currentPassenger, name: e.target.value })}
                       placeholder="Name"
-                      className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`flex-1 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                     />
                     
                     <input
@@ -839,7 +844,7 @@ window.location.href = data.payment_url;
                         });
                       }}
                       placeholder="Age"
-                      className={`w-1/3 p-1 border rounded text-sm appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`w-16 p-1 border rounded text-sm appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                       style={{ MozAppearance: 'textfield' }}
                       onWheel={e => (e.target as HTMLInputElement).blur()}
                     />
@@ -847,26 +852,25 @@ window.location.href = data.payment_url;
                     <select
                       value={currentPassenger.gender}
                       onChange={(e) => setCurrentPassenger({ ...currentPassenger, gender: e.target.value })}
-                      className={`w-1/3 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`w-20 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                     >
-                      <option value="" disabled>Select Gender</option>
+                      <option value="" disabled>Gender</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                     </select>
+                    
+                    {/* Yellow circular + button */}
+                    <button
+                      onClick={handleAddOrUpdatePassenger}
+                      className="w-8 h-8 bg-[#fbe822] hover:bg-[#f2d800] text-gray-900 font-bold rounded-full text-lg flex items-center justify-center shadow-sm transition-colors"
+                      title={editingIndex !== null ? "Update Passenger" : "Add Passenger"}
+                    >
+                      +
+                    </button>
                   </div>
                   
                   {/* Passenger suggestions */}
                   {renderPassengerSuggestions()}
-                  
-                  {/* Add/Update Passenger Button */}
-                  <div className="flex justify-end mt-2">
-                    <button
-                      onClick={handleAddOrUpdatePassenger}
-                      className="bg-[#fbe822] hover:bg-[#f2d800] text-gray-900 font-medium py-1 px-3 rounded-lg text-sm shadow-sm transition-colors"
-                    >
-                      {getAddPassengerButtonText()}
-                    </button>
-                  </div>
                 </div>
               )}
 
