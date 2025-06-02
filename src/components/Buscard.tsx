@@ -456,7 +456,6 @@ window.location.href = data.payment_url;
           .bus-icon {
             opacity: 0;
             animation: fadeIn 1s ease-in-out forwards;
-            animation-delay: 1s;
           }
         `}
         </style>
@@ -810,16 +809,16 @@ window.location.href = data.payment_url;
               {/* Passenger Input Form - Only show if not all passengers filled or if editing */}
               {(!areAllPassengersValid || editingIndex !== null) && (
                 <div className="space-y-2 mt-4">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1 sm:space-x-2">
                     {/* Seat display with proper styling based on gender */}
                     {selectedSeats[currentSeatIndex] && (
-                      <div className={`mr-1 text-black text-xs font-medium px-1 rounded flex items-center ${
+                      <div className={`text-black text-xs font-medium px-1 py-1 rounded flex items-center flex-shrink-0 ${
                         getSeatBackgroundColor(bus, selectedSeats[currentSeatIndex])
                       }`}>
                         <span>
                           {selectedSeats[currentSeatIndex].seat_number}
                         </span>
-                        <span className="ml-1">
+                        <span className="ml-1 hidden sm:inline">
                           ({selectedSeats[currentSeatIndex].type === 'window' ? 'W' : 'A'})
                         </span>
                       </div>
@@ -830,7 +829,7 @@ window.location.href = data.payment_url;
                       value={currentPassenger.name || ''}
                       onChange={(e) => setCurrentPassenger({ ...currentPassenger, name: e.target.value })}
                       placeholder="Name"
-                      className={`flex-1 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`flex-1 min-w-0 p-1 border rounded text-xs sm:text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                     />
                     
                     <input
@@ -844,7 +843,7 @@ window.location.href = data.payment_url;
                         });
                       }}
                       placeholder="Age"
-                      className={`w-16 p-1 border rounded text-sm appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`w-12 sm:w-16 p-1 border rounded text-xs sm:text-sm appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                       style={{ MozAppearance: 'textfield' }}
                       onWheel={e => (e.target as HTMLInputElement).blur()}
                     />
@@ -852,18 +851,19 @@ window.location.href = data.payment_url;
                     <select
                       value={currentPassenger.gender}
                       onChange={(e) => setCurrentPassenger({ ...currentPassenger, gender: e.target.value })}
-                      className={`w-20 p-1 border rounded text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`w-16 sm:w-20 p-1 border rounded text-xs sm:text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                     >
                       <option value="" disabled>Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
+                      <option value="Male">M</option>
+                      <option value="Female">F</option>
                     </select>
                     
                     {/* Yellow circular + button */}
                     <button
                       onClick={handleAddOrUpdatePassenger}
-                      className="w-8 h-8 bg-[#fbe822] hover:bg-[#f2d800] text-gray-900 font-bold rounded-full text-lg flex items-center justify-center shadow-sm transition-colors"
+                      className="w-6 h-6 sm:w-7 sm:h-7 bg-[#fbe822] hover:bg-[#f2d800] text-gray-900 font-bold rounded-full text-sm sm:text-base flex items-center justify-center shadow-sm transition-colors flex-shrink-0"
                       title={editingIndex !== null ? "Update Passenger" : "Add Passenger"}
+                      style={{ lineHeight: '1' }}
                     >
                       +
                     </button>
