@@ -313,7 +313,7 @@ export function ChatMessage({ message, onBook, selectedChatId, setChats }: ChatM
           <span className="font-medium text-gray-900 dark:text-gray-100">
             {!isUser && (
               <>
-                <span className="text-[#1765f3] dark:text-[#fbe822]">SPATH</span>.AI
+                <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
               </>
             )}
           </span>
