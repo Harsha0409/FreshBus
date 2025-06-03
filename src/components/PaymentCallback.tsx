@@ -14,10 +14,37 @@ function PaymentCallback() {
   const navigate = useNavigate();
   const [processingStatus, setProcessingStatus] = useState('Processing payment...');
   const [retryCount, setRetryCount] = useState(0);
+  const [hasProcessed, setHasProcessed] = useState(false); // Prevent duplicate processing
   const MAX_RETRIES = 5; // Maximum number of retries for pending payments
 
+  console.log('[PaymentCallback] Component rendered/re-rendered');
+
   useEffect(() => {
+    // Prevent duplicate processing
+    if (hasProcessed) {
+      console.log('Payment already processed, skipping...');
+      return;
+    }
+    
     const sessionId = localStorage.getItem('sessionId') || searchParams.get('session_id');
+    
+    // Additional check: prevent processing if payment status already exists
+    const existingPaymentStatus = localStorage.getItem('paymentStatus');
+    if (existingPaymentStatus) {
+      try {
+        const parsed = JSON.parse(existingPaymentStatus);
+        if (parsed.sessionId === sessionId) {
+          console.log('Payment status already exists for this session, skipping processing...');
+          setProcessingStatus('Payment already processed. Redirecting...');
+          setTimeout(() => {
+            navigate(`/c/${sessionId}`);
+          }, 1000);
+          return;
+        }
+      } catch (e) {
+        // Invalid JSON, continue with processing
+      }
+    }
     
     // Parse user object from localStorage
     let userId = '';
@@ -161,6 +188,8 @@ function PaymentCallback() {
           // 2. Get ticket details with the detailsId
           setProcessingStatus('Retrieving ticket details...');
           
+          console.log(`[PaymentCallback] Making ticket_details API call for detailsId: ${detailsId}`);
+          
           // Set a timeout for the fetch
           const detailsPromise = fetch(
             `/api/tickets/${detailsId}/ticket_details`,
@@ -249,7 +278,8 @@ Thank you for choosing FreshBus. Stay fresh!
                 age: p.age,
                 gender: p.gender,
                 seat: p.seat
-              }))
+              })),
+              billItems: detailsData.billItems || []
             });
 
             // Clean up the order ID from both storages
@@ -332,11 +362,14 @@ Thank you for choosing FreshBus. Stay fresh!
       }
     }
 
+    // Mark as processed to prevent duplicate calls
+    setHasProcessed(true);
+    
     processPayment().catch(error => {
       console.error('Payment process failed:', error);
       setProcessingStatus('Payment failed. Please try again.');
     });
-  }, []);
+  }, [hasProcessed]); // Add hasProcessed to dependencies
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900 p-4">

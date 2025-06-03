@@ -46,46 +46,6 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
 
   const handleSendMessageHelper = useCallback(
     (content: string) => {
-      // Check if there's a payment status to display
-      const paymentStatusStr = localStorage.getItem('paymentStatus');
-      if (paymentStatusStr) {
-        try {
-          const paymentStatus = JSON.parse(paymentStatusStr);
-          if (paymentStatus.sessionId === selectedChatId && paymentStatus.summary) {
-            // Create an AI message with the payment summary
-            setChats(prevChats => prevChats.map(chat => {
-              if (chat.id === selectedChatId) {
-                return {
-                  ...chat,
-                  messages: [
-                    ...chat.messages,
-                    {
-                      id: `payment-confirmation-${Date.now()}`,
-                      role: 'assistant',
-                      content: paymentStatus.ticketData
-                        ? { summary: paymentStatus.summary, ticketData: paymentStatus.ticketData, passengerData: paymentStatus.ticketData.passengers, billItems: paymentStatus.billItems }
-                        : paymentStatus.summary,
-                      timestamp: new Date()
-                    }
-                  ],
-                  lastUpdated: new Date()
-                };
-              }
-              return chat;
-            }));
-
-            // Remove the payment status from localStorage after using it
-            localStorage.removeItem('paymentStatus');
-
-            // Don't need to handle the actual message if we're displaying payment status
-            return;
-          }
-        } catch (error) {
-          console.error('Error parsing payment status:', error);
-          localStorage.removeItem('paymentStatus');
-        }
-      }
-
       // Continue with the original message handling logic
       handleSendMessage(
         content,
@@ -134,7 +94,16 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
         const paymentStatus = JSON.parse(paymentStatusStr);
         if (paymentStatus.sessionId === selectedChatId && paymentStatus.summary) {
           // Add a slight delay to ensure the UI is ready
-          setTimeout(() => {
+          setTimeout(async () => {
+            const messageContent = paymentStatus.ticketData
+              ? { 
+                  summary: paymentStatus.summary, 
+                  ticketData: paymentStatus.ticketData, 
+                  passengerData: paymentStatus.passengerData,
+                  billItems: paymentStatus.billItems || []
+                }
+              : { summary: paymentStatus.summary };
+
             // Create an AI message with the payment summary
             setChats(prevChats => prevChats.map(chat => {
               if (chat.id === selectedChatId) {
@@ -145,9 +114,7 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                     {
                       id: `payment-confirmation-${Date.now()}`,
                       role: 'assistant',
-                      content: paymentStatus.ticketData
-                        ? { summary: paymentStatus.summary, ticketData: paymentStatus.ticketData, passengerData: paymentStatus.ticketData.passengers, billItems: paymentStatus.billItems }
-                        : { summary: paymentStatus.summary },
+                      content: messageContent,
                       timestamp: new Date()
                     }
                   ],
@@ -156,6 +123,10 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
               }
               return chat;
             }));
+
+            // TODO: Save the ticket confirmation to backend for persistence
+            // For now, the ticket confirmation will only persist in the current session
+            console.log('[Layout] Ticket confirmation added to local chat state');
 
             // Remove the payment status from localStorage after using it
             localStorage.removeItem('paymentStatus');
@@ -174,7 +145,9 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
       localStorage.setItem('sessionId', urlSessionId);
 
       const chatExists = chats.some(chat => chat.id === urlSessionId);
+      console.log('[Layout] Chat exists for session:', urlSessionId, chatExists);
       if (!chatExists && isAuthenticated) {
+        console.log('[Layout] Loading conversation for session:', urlSessionId);
         loadConversationHelper(urlSessionId);
       }
     } else if (isAuthenticated) {

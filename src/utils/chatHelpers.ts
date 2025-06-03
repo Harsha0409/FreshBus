@@ -298,6 +298,7 @@ export async function loadConversation(
     }
 
     const historyData = await historyResponse.json();
+    console.log('[loadConversation] Raw history data:', historyData);
 
     const formattedMessages: Message[] = historyData.history
       .filter((msg: any) => msg.role !== 'meta')
@@ -310,6 +311,10 @@ export async function loadConversation(
             const parsed = JSON.parse(content);
             if (parsed.data?.upcoming_travels || parsed.upcoming_travels) {
               content = parsed; // Use the parsed object directly
+            } else if (parsed.summary || parsed.ticketData || parsed.recommendations) {
+              // Handle ticket confirmations, bus recommendations, and other structured data
+              console.log('[loadConversation] Found structured data:', parsed);
+              content = parsed;
             }
           } catch {
             // Not JSON, keep as string

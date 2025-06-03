@@ -150,12 +150,62 @@ export function ChatMessage({ message, onBook, selectedChatId, setChats }: ChatM
     );
   }
 
-  // --- TICKET SUMMARY RENDERING ---
+  // --- RAW TICKET DATA FILTERING (prevent JSON display) ---
   if (
     !isUser &&
     typeof parsedContent === 'object' &&
     parsedContent !== null &&
-    typeof parsedContent.summary === 'string'
+    parsedContent.ticketData &&
+    parsedContent.ticketData.invoiceNumber &&
+    !parsedContent.summary
+  ) {
+    // This is raw ticket data without summary - don't render it
+    return null;
+  }
+
+  // --- TICKET DETAILS RENDERING ---
+  if (
+    !isUser &&
+    typeof parsedContent === 'object' &&
+    parsedContent !== null &&
+    typeof parsedContent.summary === 'string' &&
+    parsedContent.ticketData &&
+    parsedContent.ticketData.invoiceNumber
+  ) {
+    return (
+      <div className="flex justify-start items-start py-1 mb-4 gap-1">
+        <div className="flex-1 ml-2 text-left">
+          <div className="flex items-center gap-1 justify-between">
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
+            </span>
+          </div>
+          <div className="prose dark:prose-invert max-w-none mt-1 text-xs sm:text-sm">
+            <ReactMarkdown
+              remarkPlugins={[remarkBreaks]}
+              components={{
+                a: (props) => (
+                  <a {...props} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">
+                    {props.children}
+                  </a>
+                ),
+              }}
+            >
+              {parsedContent.summary}
+            </ReactMarkdown>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- TICKET SUMMARY RENDERING (without ticket details) ---
+  if (
+    !isUser &&
+    typeof parsedContent === 'object' &&
+    parsedContent !== null &&
+    typeof parsedContent.summary === 'string' &&
+    !parsedContent.ticketData
   ) {
     return (
       <div className="flex justify-start items-start py-1 mb-4 gap-1">
@@ -305,7 +355,18 @@ export function ChatMessage({ message, onBook, selectedChatId, setChats }: ChatM
     );
   }
 
-  // Fallback: Render as markdown/text
+  // Fallback: Render as markdown/text (but filter out raw ticket data)
+  if (
+    !isUser &&
+    typeof parsedContent === 'object' &&
+    parsedContent !== null &&
+    (parsedContent.ticketData || parsedContent.passengerData || parsedContent.billItems)
+  ) {
+    // This looks like raw ticket data - don't render it as JSON
+    console.log('[ChatMessage] Filtering out raw ticket data:', parsedContent);
+    return null;
+  }
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-start py-1 mb-4 gap-1`}>
       <div className={`flex-1 ${!isUser ? 'ml-2' : 'mr-2'} ${isUser ? 'text-right' : 'text-left'}`}>

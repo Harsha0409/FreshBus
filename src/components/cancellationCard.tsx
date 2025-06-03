@@ -220,12 +220,29 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
       toast.success('Ticket cancelled successfully');
       setShowPolicyModal(false);
       
+      // Get the refund amount from popup calculation instead of backend for green coins
+      let refundAmountText = '';
+      if (selectedRefundMethod === 'coins') {
+        const coinsAmount = dynamicRefundCalculation?.coinsRefund.coins || 0;
+        refundAmountText = `${coinsAmount} Green Coins`;
+      } else {
+        // For cash refund, use backend response or popup calculation as fallback
+        const cashAmount = responseData.refund_amount || dynamicRefundCalculation?.cashRefund.amount || 0;
+        refundAmountText = `₹${cashAmount.toFixed(2)}`;
+      }
+      
       // Display AI message with a more customer-friendly format
+      const refundMethodText = selectedRefundMethod === 'coins' ? 'Green Coin Wallet' : 'original payment source';
+      const cancelledSeats = Array.from(selectedSeatsForCancellation).join(', ');
       const aiMessage = `Dear customer,
 
 Your ticket has been successfully cancelled. Refund has been initiated as per our policy.
 
-Amount credited: ₹${responseData.refund_amount.toFixed(2)}
+Cancelled seat(s): ${cancelledSeats}
+Amount credited: ${refundAmountText}
+Refund method: ${refundMethodText}
+
+${selectedRefundMethod === 'coins' ? 'Your Green Coins have been instantly credited to your wallet.' : 'The refund will be processed to your original payment method within 3-5 business days.'}
 
 Thank you for using our service.`;
       
@@ -250,7 +267,7 @@ Thank you for using our service.`;
   // The UI already displays a message in this case
 
   return (
-    <div className={`w-full max-w-7xl mx-auto p-4 ${theme === 'dark' ? 'dark' : ''}`}>
+    <div className={`w-full max-w-7xl mx-auto  ${theme === 'dark' ? 'dark' : ''}`}>
       {data.data.upcoming_travels.length === 0 ? (
         <>
           <div className="p-4 border border-yellow-300 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-700/50">
@@ -272,7 +289,8 @@ Thank you for using our service.`;
           return (
             <div
               key={travel.travel_details.id}
-              className="rounded-lg border bg-gradient-to-br p-2 from-blue-500 to-blue-700 border-0 text-white cursor-pointer hover:shadow-lg transition-shadow duration-200 shadow-sm"
+              className="rounded-lg border p-2 border-0 text-white cursor-pointer hover:shadow-lg transition-shadow duration-200 shadow-sm"
+              style={{ background: 'linear-gradient(to bottom right, #0078d4, #005a9e)' }}
               onClick={() => handleTravelSelect(travel)}
             >
               <div className="flex justify-between items-stretch w-full mt-2 gap-4">
@@ -320,7 +338,7 @@ Thank you for using our service.`;
                     </div>
                   </div>
                 </div>
-                <div className="w-1/3 flex flex-col items-end justify-center">
+                <div className="w-1/3 flex flex-col">
                   <div className="text-right mb-2 w-full">
                     <p className="text-sm font-bold">{arrivalTime}</p>
                     <p className="text-sm font-bold truncate">{travel.travel_details.destination.name}</p>
