@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { useTheme } from "../context/ThemeContext"
 import { UpcomingTravelsResponse, UpcomingTravel} from "../types/cancellation"
@@ -18,10 +18,34 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
   const { theme } = useTheme()
   const [selectedTravel, setSelectedTravel] = useState<UpcomingTravel | null>(null)
   const [showPolicyModal, setShowPolicyModal] = useState(false)
+  const [isModalVisible, setIsModalVisible] = useState(false)
+  const [isModalClosing, setIsModalClosing] = useState(false)
   const [showRefundPolicies, setShowRefundPolicies] = useState(false)
   const [selectedSeatsForCancellation, setSelectedSeatsForCancellation] = useState<Set<string>>(new Set())
   const [selectedRefundMethod, setSelectedRefundMethod] = useState<'cash' | 'coins'>('coins')
   const [isProcessing, setIsProcessing] = useState(false)
+
+  // Animation effect for modal
+  useEffect(() => {
+    if (showPolicyModal) {
+      // Trigger animation after modal opens
+      const timer = setTimeout(() => setIsModalVisible(true), 10)
+      return () => clearTimeout(timer)
+    }
+  }, [showPolicyModal])
+
+  // Handle modal close with animation
+  const handleModalClose = () => {
+    if (isModalClosing) return // Prevent multiple close calls
+    setIsModalClosing(true)
+    setIsModalVisible(false)
+    // Wait for animation to complete before closing modal
+    setTimeout(() => {
+      setShowPolicyModal(false)
+      setIsModalVisible(false)
+      setIsModalClosing(false)
+    }, 300)
+  }
 
   const handleTravelSelect = (travel: UpcomingTravel) => {
     setSelectedTravel(travel)
@@ -361,19 +385,43 @@ Thank you for using our service.`;
 
       {/* Modal */}
       {showPolicyModal && ReactDOM.createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm" style={{ margin: 0, padding: 0 }}>
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm" 
+          style={{ 
+            margin: 0, 
+            padding: 0,
+            opacity: isModalVisible ? 1 : 0,
+            transition: "opacity 0.3s ease-in-out"
+          }}
+          onClick={handleModalClose}
+        >
           {/* Modal Content */}
-          <div className={`relative rounded-lg shadow-lg border w-[800px] max-w-[90vw] max-h-[90vh] flex flex-col ${
-            theme === 'dark' 
-              ? 'bg-gray-900 text-white border-gray-700' 
-              : 'bg-white text-gray-900 border-gray-200'
-          }`}>
+          <div 
+            className={`relative rounded-lg shadow-lg border w-[800px] max-w-[90vw] max-h-[90vh] flex flex-col ${
+              theme === 'dark' 
+                ? 'bg-gray-900 text-white border-gray-700' 
+                : 'bg-white text-gray-900 border-gray-200'
+            }`}
+            style={{
+              transform: isModalVisible ? "scale(1) translateY(0)" : "scale(0.95) translateY(20px)",
+              opacity: isModalVisible ? 1 : 0,
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {selectedTravel && (
               <>
                 {/* Fixed Header */}
-                <div className={`flex-shrink-0 px-2 py-2 border-b ${
-                  theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-                }`}>
+                <div 
+                  className={`flex-shrink-0 px-2 py-2 border-b ${
+                    theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+                  }`}
+                  style={{
+                    opacity: isModalVisible ? 1 : 0,
+                    transform: isModalVisible ? "translateY(0)" : "translateY(-10px)",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s"
+                  }}
+                >
                   <h3 className={`text-lg font-bold ${
                     theme === 'dark' ? 'text-white' : 'text-gray-800'
                   }`}>
@@ -382,7 +430,14 @@ Thank you for using our service.`;
                 </div>
 
                 {/* Content - Always scrollable with fixed height */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-2 py-2 space-y-3 min-h-0">
+                <div 
+                  className="flex-1 overflow-y-auto custom-scrollbar px-2 py-2 space-y-3 min-h-0"
+                  style={{
+                    opacity: isModalVisible ? 1 : 0,
+                    transform: isModalVisible ? "translateY(0)" : "translateY(10px)",
+                    transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s"
+                  }}
+                >
                   <h4 className={`text-base font-bold ${
                     theme === 'dark' ? 'text-white' : 'text-gray-800'
                   }`}>
@@ -681,11 +736,18 @@ Thank you for using our service.`;
                 </div>
 
                 {/* Fixed Footer */}
-                <div className={`flex-shrink-0 flex justify-end gap-2 border-t p-2 ${
-                  theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-                }`}>
+                <div 
+                  className={`flex-shrink-0 flex justify-end gap-2 border-t p-2 ${
+                    theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+                  }`}
+                  style={{
+                    opacity: isModalVisible ? 1 : 0,
+                    transform: isModalVisible ? "translateY(0)" : "translateY(10px)",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.15s"
+                  }}
+                >
                   <button 
-                    onClick={() => setShowPolicyModal(false)}
+                    onClick={handleModalClose}
                     className={`inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 text-sm ${theme === 'dark' 
                       ? 'border border-gray-600 bg-gray-800 text-gray-200 hover:bg-gray-700 hover:text-white' 
                       : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'

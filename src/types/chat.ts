@@ -27,7 +27,7 @@ export interface Seat {
   seat_id: number;
   seat_number: number;
   price: number;
-  type?: string;
+  type?: "window" | "aisle";
   fare_details: FareDetails;
   is_reserved_female: boolean;
   is_reserved_male: boolean;
@@ -40,9 +40,18 @@ export interface SeatCategory {
 }
 
 export interface RecommendedSeats {
-  Premium?: SeatCategory;
-  Reasonable?: SeatCategory;
-  "Budget-Friendly"?: SeatCategory;
+  Premium?: {
+    window?: Seat[];
+    aisle?: Seat[];
+  };
+  Reasonable?: {
+    window?: Seat[];
+    aisle?: Seat[];
+  };
+  "Budget-Friendly"?: {
+    window?: Seat[];
+    aisle?: Seat[];
+  };
 }
 
 export interface GenderAssignments {

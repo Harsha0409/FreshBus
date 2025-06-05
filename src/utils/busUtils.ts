@@ -1,25 +1,5 @@
 import { Bus, Seat } from '../types/chat';
 
-// Define the structure of RecommendedSeats more explicitly
-export interface RecommendedSeats {
-  Premium?: {
-    window?: Seat[];
-    aisle?: Seat[];
-  };
-  Reasonable?: {
-    window?: Seat[];
-    aisle?: Seat[];
-  };
-  'Budget-Friendly'?: {
-    window?: Seat[];
-    aisle?: Seat[];
-  };
-  [key: string]: { // Add index signature to allow string indexing
-    window?: Seat[];
-    aisle?: Seat[];
-  } | undefined;
-}
-
 // Define valid category literals
 export type CategoryType = 'Premium' | 'Reasonable' | 'Budget-Friendly';
 
@@ -109,11 +89,11 @@ export function splitBusByCategory(buses: Bus[]): CategoryBus[] {
       const categorySeats: Seat[] = [
         ...(bus.recommended_seats?.[category]?.window || []).map(seat => ({
           ...seat,
-          type: 'window',
+          type: 'window' as const,
         })),
         ...(bus.recommended_seats?.[category]?.aisle || []).map(seat => ({
           ...seat,
-          type: 'aisle',
+          type: 'aisle' as const,
         })),
       ];
       if (categorySeats.length > 0) {
@@ -160,11 +140,11 @@ export function getCategorySeats(bus: Bus, category: CategoryType): Seat[] {
   return [
     ...(categorySeats.window || []).map(seat => ({
       ...seat,
-      type: 'window',
+      type: 'window' as const,
     })),
     ...(categorySeats.aisle || []).map(seat => ({
       ...seat,
-      type: 'aisle',
+      type: 'aisle' as const,
     })),
   ];
 }

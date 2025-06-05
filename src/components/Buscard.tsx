@@ -14,6 +14,7 @@ import {
   getSeatGender
 } from '../utils/busUtils';
 import ReactDOM from 'react-dom';
+import SeatLayout from './Seatlayout';
 
 interface BusCardProps {
   bus: BusWithCategory;
@@ -24,8 +25,11 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   const { theme } = useTheme();
   // Basic state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isModalClosing, setIsModalClosing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
+  const [isSeatLayoutOpen, setIsSeatLayoutOpen] = useState(false);
   
   // Boarding and dropping points
 const [selectedBoarding, setSelectedBoarding] = useState<string | null>(
@@ -99,9 +103,11 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
   // Load backend passengers when component mounts
   useEffect(() => {
     try {
+      let allPassengers: Passenger[] = [];
+      
       // Check if passengers are included in the bus data
       if (bus && (bus as any).passengers) {
-        setBackendPassengers((bus as any).passengers);
+        allPassengers = [...(bus as any).passengers];
       } else {
         // Try to get from window object or localStorage
         let storedPassengers = null;
@@ -123,9 +129,32 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
         }
         
         if (storedPassengers && Array.isArray(storedPassengers)) {
-          console.log('Found passengers:', storedPassengers);
-          setBackendPassengers(storedPassengers);
+          allPassengers = [...storedPassengers];
         }
+      }
+      
+      // Also try to get recent passengers from localStorage
+      try {
+        const recentPassengersData = localStorage.getItem('recentPassengers');
+        if (recentPassengersData) {
+          const recentPassengers = JSON.parse(recentPassengersData);
+          if (Array.isArray(recentPassengers)) {
+            // Merge with existing passengers, avoiding duplicates
+            recentPassengers.forEach(recentPass => {
+              if (!allPassengers.some(existingPass => 
+                existingPass.name.toLowerCase() === recentPass.name.toLowerCase() && 
+                existingPass.age === recentPass.age)) {
+                allPassengers.push(recentPass);
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing recent passengers:', e);
+      }
+      
+      if (allPassengers.length > 0) {
+        setBackendPassengers(allPassengers);
       }
     } catch (e) {
       console.error('Error loading passengers:', e);
@@ -166,6 +195,15 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
     }
   }, [isModalOpen, selectedSeats, bus]);
 
+  // Animation effect for modal
+  useEffect(() => {
+    if (isModalOpen) {
+      // Trigger animation after modal opens
+      const timer = setTimeout(() => setIsModalVisible(true), 10)
+      return () => clearTimeout(timer)
+    }
+  }, [isModalOpen])
+
   // Event handlers
   const handleCardClick = () => {
     setSelectedSeats(allSeats);
@@ -175,6 +213,19 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
     if (window && (window as any).busQueryResponse && (window as any).busQueryResponse.passengers) {
       localStorage.setItem('busQueryResponse', JSON.stringify((window as any).busQueryResponse));
     }
+  };
+
+  // Handle modal close with animation
+  const handleModalClose = () => {
+    if (isModalClosing) return // Prevent multiple close calls
+    setIsModalClosing(true)
+    setIsModalVisible(false)
+    // Wait for animation to complete before closing modal
+    setTimeout(() => {
+      setIsModalOpen(false)
+      setIsModalVisible(false)
+      setIsModalClosing(false)
+    }, 300)
   };
 
   const handleConfirmPayment = async () => {
@@ -259,8 +310,6 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
         freshcard: false,
         return_url: `${window.location.origin}/payment/callback?session_id=${localStorage.getItem('sessionId')}`,
       };
-      
-      console.log('Booking payload:', payload);
       
       const response = await fetch('/api/tickets/block', {
         method: 'POST',
@@ -406,7 +455,7 @@ window.location.href = data.payment_url;
       }
       
       return true;
-    }).slice(0, 3); // Limit to 3 suggestions
+    }); // Show all filtered passengers, no limit
     
     if (filteredPassengers.length === 0) {
       return null;
@@ -414,15 +463,25 @@ window.location.href = data.payment_url;
     
     return (
       <div className="mt-2">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select from previous passengers:</p>
-        <div className="flex flex-wrap gap-2 mt-1">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Select from previous passengers:
+        </p>
+        <div 
+          className="flex flex-wrap gap-2 mt-1 overflow-y-auto custom-scrollbar p-2 border rounded-lg bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-600"
+          style={{ 
+            maxHeight: '100px', // Approximately 2-3 lines of buttons with better spacing
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#cbd5e0 transparent'
+          }}
+        >
           {filteredPassengers.map((passenger, idx) => (
             <button
               key={idx}
-              className="px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-800/40 border border-blue-200 dark:border-blue-700 transition-colors font-medium"
+              className="px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-100 dark:hover:bg-blue-800/40 border border-blue-200 dark:border-blue-700 transition-colors font-medium whitespace-nowrap flex-shrink-0"
               onClick={() => handleSelectPassenger(passenger)}
+              title={`Click to select: ${passenger.name} - Age: ${passenger.age}, Gender: ${passenger.gender}`}
             >
-              {passenger.name}
+              {passenger.name} 
             </button>
           ))}
         </div>
@@ -585,8 +644,25 @@ window.location.href = data.payment_url;
 
       {/* Modal for Trip Review */}
       {isModalOpen && ReactDOM.createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-90" style={{ margin: 0, padding: 0 }}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-11/12 max-w-md">
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-90" 
+          style={{ 
+            margin: 0, 
+            padding: 0,
+            opacity: isModalVisible ? 1 : 0,
+            transition: "opacity 0.3s ease-in-out"
+          }}
+          onClick={handleModalClose}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-11/12 max-w-md"
+            style={{
+              transform: isModalVisible ? "scale(1) translateY(0)" : "scale(0.95) translateY(20px)",
+              opacity: isModalVisible ? 1 : 0,
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Header: Journey Details */}
             <div className="bg-[#0078d4] text-white rounded-t-lg p-4">
               <div className="text-center mb-2 flex items-center justify-center">
@@ -731,14 +807,22 @@ window.location.href = data.payment_url;
               <div className="flex justify-between">
                 {/* Left Side: Seat Details */}
                 <div className="space-y-1">
-                  <p className="text-sm"><strong>Recommended Seats:</strong></p>
-                  <div className="inline-grid grid-cols-3 gap-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm"><strong>Recommended Seats:</strong></p>
+                  </div>
+                  <div className="inline-grid grid-cols-3 gap-1 text-sm ">
                     {selectedSeats.map((seat, index) => (
                       <div key={index} className={`text-center rounded-md px-2 py-1 text-gray-900 ${getSeatBackgroundColor(bus, seat)}`}>
                         {`${seat.seat_number}(${seat.type === 'window' ? 'W' : 'A'})`}
                       </div>
                     ))}
                   </div>
+                  <button
+                      onClick={() => setIsSeatLayoutOpen(true)}
+                      className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition-colors relative top-5"
+                    >
+                      View Seat Position
+                    </button>
                 </div>
 
                 {/* Right Side: Fare Details */}
@@ -871,6 +955,12 @@ window.location.href = data.payment_url;
                   
                   {/* Passenger suggestions */}
                   {renderPassengerSuggestions()}
+                  
+                  {/* Debug info - can be removed in production */}
+                  {backendPassengers.length > 0 ? (
+                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -886,7 +976,7 @@ window.location.href = data.payment_url;
               {/* Action Buttons */}
               <div className="flex justify-between mt-4">
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleModalClose}
                   className="py-1 px-4 rounded-lg font-medium text-sm transition-colors bg-gray-300 text-gray-800 hover:bg-gray-400"
                 >
                   Close
@@ -906,6 +996,17 @@ window.location.href = data.payment_url;
             </div>
           </div>
         </div>,
+        document.body
+      )}
+
+      {/* Seat Layout Modal */}
+      {isSeatLayoutOpen && ReactDOM.createPortal(
+        <SeatLayout
+          bus={bus}
+          selectedSeats={selectedSeats}
+          onSeatSelect={setSelectedSeats}
+          onClose={() => setIsSeatLayoutOpen(false)}
+        />,
         document.body
       )}
     </div>
