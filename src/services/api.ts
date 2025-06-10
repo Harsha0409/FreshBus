@@ -272,19 +272,65 @@ export const authService = {
     }
   },
 
-  // Generic Fetch with Retry on 401
+  // Refresh Token
+  async refreshToken(): Promise<boolean> {
+    try {
+      console.log('Attempting to refresh token...');
+      const refreshResponse = await fetch('/api/auth/refresh-token', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (refreshResponse.ok) {
+        console.log('Token refreshed successfully');
+        return true;
+      } else {
+        console.log('Token refresh failed:', refreshResponse.status);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return false;
+    }
+  },
+
+  // Generic Fetch with Automatic Token Refresh
   async fetchWithRefresh(url: string, opts: RequestInit = {}): Promise<Response> {
     // Ensure we always include credentials
     const options = { ...opts, credentials: 'include' as RequestCredentials };
     
+    // First attempt
     let response = await fetch(url, options);
 
+    // Check if the token was expired
     if (response.status === 401) {
-      console.log('Access token expired, clearing auth state...');
-      this.clearAuth();
-      // Trigger login modal
-      window.dispatchEvent(new CustomEvent('auth:required'));
-      return Promise.reject(new Error('Session expired'));
+      console.log('Access token expired, attempting to refresh...');
+      
+      // Try to refresh the token
+      const refreshed = await this.refreshToken();
+      
+      if (refreshed) {
+        console.log('Token refreshed, retrying original request...');
+        // Retry the original request with the new token
+        response = await fetch(url, options);
+        
+        // If still 401 after refresh, clear auth
+        if (response.status === 401) {
+          console.log('Still unauthorized after token refresh, clearing auth...');
+          this.clearAuth();
+          window.dispatchEvent(new CustomEvent('auth:required'));
+          return Promise.reject(new Error('Session expired'));
+        }
+      } else {
+        console.log('Token refresh failed, clearing auth state...');
+        this.clearAuth();
+        // Trigger login modal instead of page reload
+        window.dispatchEvent(new CustomEvent('auth:required'));
+        return Promise.reject(new Error('Session expired'));
+      }
     }
 
     return response;
@@ -343,3 +389,20 @@ export const authService = {
     return false;
   },
 };
+
+// Utility function for making authenticated API calls with automatic token refresh
+export async function apiCall(url: string, options: RequestInit = {}): Promise<Response> {
+  return authService.fetchWithRefresh(url, options);
+}
+
+// Utility function for making authenticated API calls and parsing JSON response
+export async function apiCallJson<T = any>(url: string, options: RequestInit = {}): Promise<T> {
+  const response = await authService.fetchWithRefresh(url, options);
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(errorData.message || `Request failed with status ${response.status}`);
+  }
+  
+  return response.json();
+}
