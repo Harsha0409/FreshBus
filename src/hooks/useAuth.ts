@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../services/api';
 
+// Cache for auth state to prevent unnecessary re-authentication
+let authStateCache = {
+  isAuthenticated: false,
+  lastChecked: 0,
+  isValid: false
+};
+
 export const useAuth = () => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -14,6 +21,15 @@ export const useAuth = () => {
         const initializeAuth = async () => {
             if (!isMounted) return;
             
+            // Check if we have a valid cached auth state (less than 5 minutes old)
+            const now = Date.now();
+            if (authStateCache.isValid && (now - authStateCache.lastChecked) < 300000) {
+                console.log('[useAuth] Using cached auth state');
+                setIsAuthenticated(authStateCache.isAuthenticated);
+                setIsLoading(false);
+                return;
+            }
+            
             console.log('[useAuth] Starting auth initialization on page load');
             setIsLoading(true);
             
@@ -25,6 +41,13 @@ export const useAuth = () => {
                 
                 console.log('[useAuth] Auth initialization result:', authenticated);
                 setIsAuthenticated(authenticated);
+                
+                // Update cache
+                authStateCache = {
+                    isAuthenticated: authenticated,
+                    lastChecked: now,
+                    isValid: true
+                };
                 
                 // Handle navigation after auth check
                 if (authenticated) {
@@ -45,6 +68,8 @@ export const useAuth = () => {
                 console.error('Auth initialization error:', error);
                 if (isMounted) {
                     setIsAuthenticated(false);
+                    // Invalidate cache on error
+                    authStateCache.isValid = false;
                 }
             } finally {
                 if (isMounted) {
@@ -65,6 +90,13 @@ export const useAuth = () => {
             const authenticated = authService.isAuthenticated();
             console.log('[useAuth] Storage change auth result:', authenticated);
             setIsAuthenticated(authenticated);
+            
+            // Update cache
+            authStateCache = {
+                isAuthenticated: authenticated,
+                lastChecked: Date.now(),
+                isValid: true
+            };
         };
 
         // Listen for custom auth events
@@ -73,6 +105,8 @@ export const useAuth = () => {
             
             console.log('[useAuth] Auth required event received');
             setIsAuthenticated(false);
+            // Invalidate cache
+            authStateCache.isValid = false;
             window.dispatchEvent(new CustomEvent('login:required'));
         };
 
@@ -90,6 +124,12 @@ export const useAuth = () => {
                     if (isMounted) {
                         console.log('[useAuth] Authentication status updated after success:', authenticated);
                         setIsAuthenticated(authenticated);
+                        // Update cache
+                        authStateCache = {
+                            isAuthenticated: authenticated,
+                            lastChecked: Date.now(),
+                            isValid: true
+                        };
                         setIsLoading(false);
                     }
                 } catch (error) {

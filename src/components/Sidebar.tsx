@@ -140,7 +140,8 @@ export function Sidebar({
     // Also listen for auth success to immediately fetch chats
     const handleAuthSuccess = () => {
       console.log('[Sidebar] Auth success event received, fetching chats');
-      setTimeout(fetchChats, 100); // Small delay to ensure auth state is updated
+      const AUTH_DELAY_MS = 100; // Small delay to ensure auth state is updated
+      setTimeout(fetchChats, AUTH_DELAY_MS);
     };
 
     window.addEventListener('auth:success', handleAuthSuccess);
@@ -204,7 +205,7 @@ export function Sidebar({
         <div className="h-[calc(100vh-10rem)] overflow-y-auto pb-4 custom-scrollbar">
           <div className="px-2">
             {isLoading ? (
-              <div className="text-center text-gray-400 mt-8">Loading conversations...</div>
+              <div className="text-gray-400 mt-8">Loading conversations...</div>
             ) : userChats.length === 0 ? (
               <div className="text-center text-gray-400 mt-8">No previous chats found.</div>
             ) : (

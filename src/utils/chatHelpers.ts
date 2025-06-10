@@ -246,8 +246,16 @@ export async function loadConversation(
 
     console.log(`[loadConversation] Loading conversation: ${conversationId}`);
 
-    const historyResponse = await authService.fetchWithRefresh(
-      `/api/history?user_id=${user.id}&session_id=${conversationId}`
+    // Skip authentication test for chat history loading
+    const historyResponse = await fetch(
+      `/api/history?user_id=${user.id}&session_id=${conversationId}`,
+      {
+        credentials: 'include',
+        headers: {
+          'X-User-ID': user.id.toString(),
+          'X-Session-ID': conversationId
+        }
+      }
     );
 
     if (!historyResponse.ok) {

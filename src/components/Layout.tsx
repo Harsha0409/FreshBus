@@ -32,6 +32,7 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [showLogout, setShowLogout] = useState(false);
+  const [isChatLoading, setIsChatLoading] = useState(false);
   
   // Add loading states and processed sessions to prevent loops
   const [loadingStates, setLoadingStates] = useState<Set<string>>(new Set());
@@ -84,9 +85,12 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
         return;
       }
       
+      setIsChatLoading(true);
       setLoadingStates(prev => new Set(prev).add(conversationId));
       
       try {
+        // Only load conversation if user is authenticated
+        if (isAuthenticated) {
         await loadConversation(
           conversationId,
           setChats,
@@ -94,6 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
           navigate,
           location.pathname
         );
+        }
       } catch (error) {
         console.error('Error loading conversation:', error);
       } finally {
@@ -102,9 +107,10 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
           newSet.delete(conversationId);
           return newSet;
         });
+        setIsChatLoading(false);
       }
     },
-    [setChats, navigate, location.pathname]
+    [setChats, navigate, location.pathname, isAuthenticated]
   );
 
   // Simple session ID effect
@@ -198,6 +204,7 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
       const chatExists = chats.some(chat => chat.id === urlSessionId);
       console.log('[Layout] Chat exists for session:', urlSessionId, chatExists);
       
+      // Only load conversation if chat doesn't exist and user is authenticated
       if (!chatExists && isAuthenticated) {
         console.log('[Layout] Loading conversation for session:', urlSessionId);
         loadConversationHelper(urlSessionId);
@@ -259,16 +266,25 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedChat?.messages]);
 
-  // Show loading state while auth is being checked
+  // Modify the Sidebar onChatSelect to prevent unnecessary auth checks
+  const handleChatSelect = useCallback((chatId: string) => {
+    // Don't trigger auth check, just update the state and URL
+    setIsChatLoading(true);
+    setSelectedChatId(chatId);
+    navigate(`/c/${chatId}`, { replace: true });
+    
+    // Check if chat exists in current state
+    const chatExists = chats.some(chat => chat.id === chatId);
+    if (!chatExists && isAuthenticated) {
+      loadConversationHelper(chatId);
+    } else {
+      setIsChatLoading(false);
+    }
+  }, [navigate, chats, isAuthenticated, loadConversationHelper]);
+
+  // Remove the full page loading state
   if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -404,7 +420,7 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
             onClose={() => setIsSidebarOpen(false)}
             chats={chats}
             selectedChatId={selectedChatId}
-            onChatSelect={setSelectedChatId}
+            onChatSelect={handleChatSelect}
             onNewChat={handleNewChatHelper}
             onLoadConversation={loadConversationHelper}
           />
@@ -425,6 +441,14 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                 {/* Chat messages area */}
                 <div className="fixed left-0 right-0" style={{ top: '3rem', bottom: '4.5rem', zIndex: 10 }}>
                   <div className="w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6 h-full overflow-y-auto hide-scrollbar">
+                    {isChatLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1765f3] dark:border-[#fbe822]"></div>
+                          <p className="text-[var(--color-text)] text-sm">Loading conversation...</p>
+                        </div>
+                      </div>
+                    ) : (
                     <div className="py-1.5 space-y-1">
                       {selectedChat?.messages.map((message) => (
                         <ChatMessage
@@ -437,6 +461,7 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                       ))}
                       <div ref={messagesEndRef} />
                     </div>
+                    )}
                   </div>
                 </div>
                 <div

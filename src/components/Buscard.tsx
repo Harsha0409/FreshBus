@@ -494,48 +494,21 @@ window.location.href = data.payment_url;
   if (showSkeleton) {
     return (
       <div className="rounded-lg shadow-md p-4 w-full bg-[#0078d4] relative overflow-hidden">
-        <style>
-          {`
-          @keyframes blurPulse {
-            0%, 100% { filter: blur(4px); opacity: 0.7; }
-            50% { filter: blur(8px); opacity: 0.5; }
-          }
-          .blur-item {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            animation: blurPulse 3s ease-in-out infinite;
-          }
-          .blur-delay-1 { animation-delay: 0s; }
-          .blur-delay-2 { animation-delay: 0.5s; }
-          .blur-delay-3 { animation-delay: 1s; }
-          
-          @keyframes fadeIn {
-            0% { opacity: 0; }
-            100% { opacity: 1; }
-          }
-          .bus-icon {
-            opacity: 0;
-            animation: fadeIn 1s ease-in-out forwards;
-          }
-        `}
-        </style>
-        <div className="relative">
-          <div className="bus-icon absolute inset-0 flex items-center justify-center opacity-20">
-            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-              <path d="M8 6v6"></path><path d="M15 6v6"></path><path d="M2 12h19.6"></path>
-              <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4c-1.1 0-2.1.8-2.4 1.8L.2 13c-.1.4-.2.8-.2 1.2 0 .4.1.8.2 1.2l.8 2.8H4"></path>
-              <circle cx="7" cy="18" r="2"></circle><path d="M9 18h4"></path><circle cx="17" cy="18" r="2"></circle>
-            </svg>
-          </div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="blur-item blur-delay-1 h-16 w-1/4"></div>
-            <div className="blur-item blur-delay-2 h-16 w-1/3 mx-4"></div>
-            <div className="blur-item blur-delay-3 h-16 w-1/4"></div>
-          </div>
-          <div className="flex justify-between">
-            <div className="blur-item blur-delay-2 h-20 w-3/5 mr-2"></div>
-            <div className="blur-item blur-delay-1 h-20 w-2/5"></div>
-          </div>
+        <div className="bus-icon absolute inset-0 flex items-center justify-center opacity-20">
+          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+            <path d="M8 6v6"></path><path d="M15 6v6"></path><path d="M2 12h19.6"></path>
+            <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4c-1.1 0-2.1.8-2.4 1.8L.2 13c-.1.4-.2.8-.2 1.2 0 .4.1.8.2 1.2l.8 2.8H4"></path>
+            <circle cx="7" cy="18" r="2"></circle><path d="M9 18h4"></path><circle cx="17" cy="18" r="2"></circle>
+          </svg>
+        </div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="h-16 w-1/4 bg-gray-200/20 rounded"></div>
+          <div className="h-16 w-1/3 bg-gray-200/20 rounded mx-4"></div>
+          <div className="h-16 w-1/4 bg-gray-200/20 rounded"></div>
+        </div>
+        <div className="flex justify-between">
+          <div className="h-20 w-3/5 bg-gray-200/20 rounded mr-2"></div>
+          <div className="h-20 w-2/5 bg-gray-200/20 rounded"></div>
         </div>
       </div>
     );
@@ -665,10 +638,10 @@ window.location.href = data.payment_url;
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header: Journey Details */}
-            <div className="bg-[#0078d4] text-white rounded-t-lg p-4">
+            <div className="bg-[#0078d4] text-white rounded-t-lg p-3">
               <div className="text-center mb-2 flex items-center justify-center">
-                <h4 className="font-semibold text-sm">Trip Review - </h4>
-                <div className={`ml-2 px-2 py-0.5 rounded-lg text-xs font-bold ${categoryStyle.textColor}`}
+                <h4 className="font-semibold text-xs">Trip Review - </h4>
+                <div className={`ml-2 px-1.5 py-0.5 rounded-lg text-[10px] font-bold ${categoryStyle.textColor}`}
                      style={{ background: categoryStyle.background }}>
                   {bus.category}
                 </div>
@@ -676,16 +649,15 @@ window.location.href = data.payment_url;
 
               <div className="flex items-center justify-between">
                 <div className="text-left">
-                  <p className="text-sm font-semibold">{convertToIST(bus.startTime).date}</p>
-                  <p className="text-sm">{bus.from}</p>
-                  <p className="text-sm">{convertToIST(bus.startTime).time}</p>
+                  <p className="text-xs font-semibold">{convertToIST(bus.startTime).date}</p>
+                  <p className="text-xs">{bus.from}</p>
                 </div>
 
                 <div className="flex flex-col items-center mx-4 w-32">
                   <div className="flex items-center w-full">
                     <div className="flex-1 h-[1.5px] bg-[#fbe822]" />
                     <span className="mx-2 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#fbe822]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#fbe822]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
                         <path stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2 2" />
                       </svg>
@@ -693,14 +665,14 @@ window.location.href = data.payment_url;
                     <div className="flex-1 h-[1.5px] bg-[#fbe822]" />
                   </div>
                   <div className="flex justify-center mt-1">
-                    <p className="text-sm font-semibold text-[#fbe822]">{bus.duration}</p>
+                    <p className="text-xs font-semibold text-[#fbe822]">{bus.duration}</p>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <p className="text-sm font-semibold">{convertToIST(bus.endTime).date}</p>
-                  <p className="text-sm">{bus.to}</p>
-                  <p className="text-sm">{convertToIST(bus.endTime).time}</p>
+                  <p className="text-xs font-semibold">{convertToIST(bus.endTime).date}</p>
+                  <p className="text-xs">{bus.to}</p>
+                 
                 </div>
               </div>
 
@@ -709,12 +681,22 @@ window.location.href = data.payment_url;
                 <div className="w-1/2 pr-2 relative">
                   <button
                     onClick={() => setDropdownOpen(prev => ({ boarding: !prev.boarding, dropping: false }))}
-                    className={`w-full flex items-center justify-between text-xs ${
+                    className={`w-full flex items-center justify-between text-[10px] ${
                       theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-50 hover:bg-gray-100'
                     } p-1 rounded transition-colors`}
                   >
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      {selectedBoarding || 'Select Boarding Point'}
+                    <span className="font-medium text-gray-700 dark:text-gray-300 flex-1 flex justify-between items-center">
+                      {selectedBoarding ? (
+                        <>
+                          <span className="truncate">{selectedBoarding}</span>
+                          <span className="text-[9px] text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0">
+                            {bus.allBoardingPoints.find(bp => bp.boarding_point.name === selectedBoarding) && 
+                             convertToIST(bus.allBoardingPoints.find(bp => bp.boarding_point.name === selectedBoarding)!.currentTime).time}
+                          </span>
+                        </>
+                      ) : (
+                        'Select Boarding Point & Time'
+                      )}
                     </span>
                     <span className="text-gray-500 dark:text-gray-400 ml-2">▼</span>
                   </button>
@@ -732,7 +714,7 @@ window.location.href = data.payment_url;
                         return (
                           <button
                             key={point.boarding_point_id}
-                            className={`dropdown-item w-full p-1 text-left rounded gap-1 text-xs ${
+                            className={`dropdown-item w-full p-1 text-left rounded gap-1 text-[10px] ${
                               isSelected
                                 ? 'bg-[var(--color-primary)] text-white'
                                 : 'hover:bg-[var(--color-secondary)] hover:text-white'
@@ -743,7 +725,7 @@ window.location.href = data.payment_url;
                             }}
                           >
                             <p className="font-medium">{point.boarding_point.name}</p>
-                            <p className="text-[10px] text-gray-300">
+                            <p className="text-[9px] text-gray-300">
                               {time} - {point.boarding_point.landmark}
                             </p>
                           </button>
@@ -757,12 +739,22 @@ window.location.href = data.payment_url;
                 <div className="w-1/2 pl-2 relative">
                   <button
                     onClick={() => setDropdownOpen(prev => ({ dropping: !prev.dropping, boarding: false }))}
-                    className={`w-full flex items-center justify-between text-xs ${
+                    className={`w-full flex items-center justify-between text-[10px] ${
                       theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-50 hover:bg-gray-100'
                     } p-1 rounded transition-colors`}
                   >
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      {selectedDropping || 'Select Dropping Point'}
+                    <span className="font-medium text-gray-700 dark:text-gray-300 flex-1 flex justify-between items-center">
+                      {selectedDropping ? (
+                        <>
+                          <span className="truncate">{selectedDropping}</span>
+                          <span className="text-[9px] text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0">
+                            {bus.allDroppingPoints.find(dp => dp.dropping_point.name === selectedDropping) && 
+                             convertToIST(bus.allDroppingPoints.find(dp => dp.dropping_point.name === selectedDropping)!.currentTime).time}
+                          </span>
+                        </>
+                      ) : (
+                        'Select Dropping Point & Time'
+                      )}
                     </span>
                     <span className="text-gray-500 dark:text-gray-400 ml-2">▼</span>
                   </button>
@@ -780,7 +772,7 @@ window.location.href = data.payment_url;
                         return (
                           <button
                             key={point.dropping_point_id}
-                            className={`dropdown-item w-full p-1 text-left rounded gap-1 text-xs ${
+                            className={`dropdown-item w-full p-1 text-left rounded gap-1 text-[10px] ${
                               isSelected
                                 ? 'bg-[var(--color-primary)] text-white'
                                 : 'hover:bg-[var(--color-secondary)] hover:text-white'
@@ -791,7 +783,7 @@ window.location.href = data.payment_url;
                             }}
                           >
                             <p className="font-medium">{point.dropping_point.name}</p>
-                            <p className="text-[10px] text-gray-300">
+                            <p className="text-[9px] text-gray-300">
                               {time} - {point.dropping_point.landmark}
                             </p>
                           </button>
@@ -804,89 +796,96 @@ window.location.href = data.payment_url;
             </div>
 
             {/* Body: Fare and Passenger Details */}
-            <div className="p-4 text-black dark:text-white">
+            <div className="p-3 text-black dark:text-white">
               <div className="flex justify-between">
                 {/* Left Side: Seat Details */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm"><strong>Recommended Seats:</strong></p>
+                <div className="flex flex-col h-full"> 
+                 <div className="flex items-center justify-between flex-grow">
+                    <p className="text-xs"><strong>Recommended Seats:</strong></p>
                   </div>
-                  <div className="inline-grid grid-cols-3 gap-1 text-sm ">
+                  <div className="inline-grid grid-cols-3 gap-1 text-xs">
                     {selectedSeats.map((seat, index) => (
-                      <div key={index} className={`text-center rounded-md px-2 py-1 text-gray-900 ${getSeatBackgroundColor(bus, seat)}`}>
+                      <div key={index} className={`text-center rounded-md p-1 text-gray-900 ${getSeatBackgroundColor(bus, seat)}`}>
                         {`${seat.seat_number}(${seat.type === 'window' ? 'W' : 'A'})`}
                       </div>
                     ))}
                   </div>
-                  <button
+                  <div className="mt-3">
+                    <button
                       onClick={() => setIsSeatLayoutOpen(true)}
-                      className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition-colors relative top-5"
+                      className="text-[10px] bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition-colors w-full"
                     >
                       View Seat Position
                     </button>
+                  </div>
                 </div>
+
 
                 {/* Right Side: Fare Details */}
                 <div className="space-y-1 w-[40%] text-left ml-4">
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs">
                     <strong>Base Fare:</strong>
                     <span>₹{categoryFare.baseFare.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs">
                     <strong>GST:</strong>
                     <span>₹{categoryFare.gst.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-green-500 text-sm">
+                  <div className="flex justify-between text-green-500 text-xs">
                     <strong>Discount:</strong>
                     <span>₹{categoryFare.discount.toFixed(2)}</span>
                   </div>
-                  <div className="border-t border-gray-300 my-2"></div>
-                  <div className="flex justify-between text-sm font-semibold">
+                  <div className="border-t border-gray-300 my-1"></div>
+                  <div className="flex justify-between text-xs font-semibold">
                     <strong>Total Fare:</strong>
                     <span>₹{categoryFare.total.toFixed(2)}</span>
                   </div>
-                  <div className="border-t border-gray-300 my-2"></div>
+                  <div className="border-t border-gray-300 my-1"></div>
                 </div>
               </div>
 
 
               {/* Green Coins and Fresh Card Section */}
-              <div className="flex items-center justify-between mt-2 space-x-4">
+              <div className="flex items-stretch justify-between mt-2 space-x-3">
                 {/* Green Coins */}
-                <div className="flex items-center bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-1 flex-1">
-                  <div className="flex items-center space-x-2">
-                    <div>
-                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Green Coins Balance</p>
-                      <p className="text-sm font-bold text-green-600">100</p>
+                <div className="flex flex-col justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-2 flex-1 min-h-[3rem]">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center">
+                      <p className="text-[10px] font-medium text-gray-700 dark:text-gray-300">
+                        Green Coins Balance: <span className="text-xs font-bold text-green-600 ml-1">100</span>
+                      </p>
                     </div>
+                    <button className="bg-green-500 hover:bg-green-600 text-white text-[10px] px-2 py-0.5 rounded-full transition-colors">
+                      Redeem
+                    </button>
                   </div>
-                  <button className="ml-auto bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 rounded-full transition-colors">
-                    Redeem Now
-                  </button>
+                  <div className="text-[10px] text-gray-700 dark:text-gray-300 mt-1">
+                    Earn & Save on rides
+                  </div>
                 </div>
 
                 {/* Fresh Card */}
-                <div className="flex flex-col items-start bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-1 flex-1">
+                <div className="flex flex-col justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-2 flex-1 min-h-[3rem]">
                   <div className="flex justify-between w-full">
-                    <div className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
+                    <div className=" text-white text-[10px] font-bold">
                       FRESH CARD
                     </div>
-                    <button className="ml-auto bg-yellow-400 hover:bg-yellow-500 text-gray-900 text-xs px-3 py-1 rounded transition-colors font-medium">
+                    <button className="ml-auto bg-yellow-400 hover:bg-yellow-500 text-gray-900 text-[10px] px-2 py-1 rounded transition-colors font-medium">
                       Apply
                     </button>
                   </div>
-                  <p className="text-xs text-gray-700 dark:text-gray-300 mt-1 w-full text-left">Save ₹500 On Fresh Bus Rides</p>
+                  <p className="text-[10px] text-gray-700 dark:text-gray-300 mt-1 w-full text-left">Save ₹500 On Fresh Bus Rides</p>
                 </div>
               </div>
               
               {/* Passenger List */}
-              <div className="mt-2 flex flex-wrap gap-1 overflow-y-auto custom-scrollbar"
-                 style={{ maxHeight: '80px', width: '100%', padding: '5px', borderRadius: '8px' }}>
+              <div className=" flex flex-wrap gap-1 mt-1 mb-1 overflow-y-auto custom-scrollbar"
+                 style={{ maxHeight: '70px', width: '100%', padding: '4px', borderRadius: '8px' }}>
                 {passengerDetails.map((passenger, index) =>
                   passenger.name && passenger.age ? (
                     <div
                       key={index}
-                      className="flex h-7 px-2 items-center justify-between rounded-lg text-sm text-gray-800 dark:text-white border border-gray-300 dark:border-gray-700"
+                      className="flex h-6 px-2 items-center justify-between rounded-lg text-xs text-gray-800 dark:text-white border border-gray-300 dark:border-gray-700"
                       style={{ background: 'transparent', cursor: 'pointer' }}
                       onClick={() => {
                         setEditingIndex(index);
@@ -895,7 +894,7 @@ window.location.href = data.payment_url;
                       }}
                     >
                       <span className="flex items-center">
-                        <div className={`mr-1 text-black text-xs font-medium px-1 rounded ${
+                        <div className={`mr-1 text-black text-[10px] font-medium px-1 rounded ${
                           selectedSeats[index] ? getSeatBackgroundColor(bus, selectedSeats[index]) : 'bg-green-500'
                         }`}>
                           {selectedSeats[index]?.seat_number || 'N/A'}
@@ -923,11 +922,11 @@ window.location.href = data.payment_url;
 
               {/* Passenger Input Form - Only show if not all passengers filled or if editing */}
               {(!areAllPassengersValid || editingIndex !== null) && (
-                <div className="space-y-2 mt-4">
+                <div className="space-y-2 ">
                   <div className="flex items-center space-x-1 sm:space-x-2">
                     {/* Seat display with proper styling based on gender */}
                     {selectedSeats[currentSeatIndex] && (
-                      <div className={`text-black text-xs font-medium px-1 py-1 rounded flex items-center flex-shrink-0 ${
+                      <div className={`text-black text-[10px] font-medium px-1 py-1 rounded flex items-center flex-shrink-0 ${
                         getSeatBackgroundColor(bus, selectedSeats[currentSeatIndex])
                       }`}>
                         <span>
@@ -948,7 +947,7 @@ window.location.href = data.payment_url;
                         setCurrentPassenger({ ...currentPassenger, name: value });
                       }}
                       placeholder="Name"
-                      className={`flex-1 min-w-0 p-1 border rounded text-xs sm:text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`flex-1 min-w-0 p-1 border rounded text-[10px] sm:text-xs ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                     />
                     
                     <input
@@ -968,7 +967,7 @@ window.location.href = data.payment_url;
                       placeholder="Age"
                       min="1"
                       max="120"
-                      className={`w-12 sm:w-16 p-1 border rounded text-xs sm:text-sm appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`w-10 sm:w-12 p-1 border rounded text-[10px] sm:text-xs appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                       style={{ MozAppearance: 'textfield' }}
                       onWheel={e => (e.target as HTMLInputElement).blur()}
                     />
@@ -976,7 +975,7 @@ window.location.href = data.payment_url;
                     <select
                       value={currentPassenger.gender}
                       onChange={(e) => setCurrentPassenger({ ...currentPassenger, gender: e.target.value })}
-                      className={`w-16 sm:w-20 p-1 border rounded text-xs sm:text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
+                      className={`w-12 sm:w-16 p-1 border rounded text-[10px] sm:text-xs ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                     >
                       <option value="" disabled>Gender</option>
                       <option value="Male">M</option>
@@ -986,7 +985,7 @@ window.location.href = data.payment_url;
                     {/* Yellow circular + button */}
                     <button
                       onClick={handleAddOrUpdatePassenger}
-                      className="w-6 h-6 sm:w-7 sm:h-7 bg-[#fbe822] hover:bg-[#f2d800] text-gray-900 font-bold rounded-full text-sm sm:text-base flex items-center justify-center shadow-sm transition-colors flex-shrink-0"
+                      className="w-5 h-5 sm:w-6 sm:h-6 bg-[#fbe822] hover:bg-[#f2d800] text-gray-900 font-bold rounded-full text-xs sm:text-sm flex items-center justify-center shadow-sm transition-colors flex-shrink-0"
                       title={editingIndex !== null ? "Update Passenger" : "Add Passenger"}
                       style={{ lineHeight: '1' }}
                     >
@@ -1007,25 +1006,25 @@ window.location.href = data.payment_url;
 
               {/* Show a message when all passengers are added */}
               {areAllPassengersValid && !editingIndex && (
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                <div className="mt-3 text-center">
+                  <p className="text-xs text-green-600 dark:text-green-400 font-medium">
                     ✓ All passenger details completed
                   </p>
                 </div>
               )}
               
               {/* Action Buttons */}
-              <div className="flex justify-between mt-4">
+              <div className="flex justify-between mt-3">
                 <button
                   onClick={handleModalClose}
-                  className="py-1 px-4 rounded-lg font-medium text-sm transition-colors bg-gray-300 text-gray-800 hover:bg-gray-400"
+                  className="py-1 px-3 rounded-lg font-medium text-xs transition-colors bg-gray-300 text-gray-800 hover:bg-gray-400"
                 >
                   Close
                 </button>
                 <button
                   onClick={handleConfirmPayment}
                   disabled={isProcessing || !areAllPassengersValid}
-                  className={`py-1 px-4 rounded-lg font-medium text-sm transition-colors ${
+                  className={`py-1 px-3 rounded-lg font-medium text-xs transition-colors ${
                     isProcessing || !areAllPassengersValid
                       ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
                       : 'bg-blue-600 text-white hover:bg-blue-700'
