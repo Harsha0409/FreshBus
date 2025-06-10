@@ -15,6 +15,7 @@ import {
 } from '../utils/busUtils';
 import ReactDOM from 'react-dom';
 import SeatLayout from './Seatlayout';
+import { authService } from '../services/api';
 
 interface BusCardProps {
   bus: BusWithCategory;
@@ -311,11 +312,10 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
         return_url: `${window.location.origin}/payment/callback?session_id=${localStorage.getItem('sessionId')}`,
       };
       
-      const response = await fetch('/api/tickets/block', {
+      const response = await authService.fetchWithRefresh('/api/tickets/block', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
         },
         body: JSON.stringify(payload),
       });
@@ -426,7 +426,7 @@ window.location.href = data.payment_url;
 
   // Render passenger suggestions from backend
   const renderPassengerSuggestions = () => {
-    if (backendPassengers.length === 0 || editingIndex !== null) {
+    if (backendPassengers.length === 0) {
       return null;
     }
     
@@ -435,8 +435,9 @@ window.location.href = data.payment_url;
     const requiredGender = seatGender || null;
     
     // Get names of already added passengers to avoid duplicates
+    // Exclude the current passenger being edited
     const addedNames = passengerDetails
-      .filter(p => p.name)
+      .filter((p, index) => p.name && index !== editingIndex)
       .map(p => p.name.toLowerCase().trim());
     
     // Filter passengers that match the seat gender requirements and aren't already added
@@ -455,7 +456,7 @@ window.location.href = data.payment_url;
       }
       
       return true;
-    }); // Show all filtered passengers, no limit
+    });
     
     if (filteredPassengers.length === 0) {
       return null;
@@ -469,7 +470,7 @@ window.location.href = data.payment_url;
         <div 
           className="flex flex-wrap gap-2 mt-1 overflow-y-auto custom-scrollbar p-2 border rounded-lg bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-600"
           style={{ 
-            maxHeight: '100px', // Approximately 2-3 lines of buttons with better spacing
+            maxHeight: '50px',
             scrollbarWidth: 'thin',
             scrollbarColor: '#cbd5e0 transparent'
           }}
@@ -847,6 +848,36 @@ window.location.href = data.payment_url;
                   <div className="border-t border-gray-300 my-2"></div>
                 </div>
               </div>
+
+
+              {/* Green Coins and Fresh Card Section */}
+              <div className="flex items-center justify-between mt-2 space-x-4">
+                {/* Green Coins */}
+                <div className="flex items-center bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-1 flex-1">
+                  <div className="flex items-center space-x-2">
+                    <div>
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Green Coins Balance</p>
+                      <p className="text-sm font-bold text-green-600">100</p>
+                    </div>
+                  </div>
+                  <button className="ml-auto bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 rounded-full transition-colors">
+                    Redeem Now
+                  </button>
+                </div>
+
+                {/* Fresh Card */}
+                <div className="flex flex-col items-start bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-1 flex-1">
+                  <div className="flex justify-between w-full">
+                    <div className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
+                      FRESH CARD
+                    </div>
+                    <button className="ml-auto bg-yellow-400 hover:bg-yellow-500 text-gray-900 text-xs px-3 py-1 rounded transition-colors font-medium">
+                      Apply
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-700 dark:text-gray-300 mt-1 w-full text-left">Save ₹500 On Fresh Bus Rides</p>
+                </div>
+              </div>
               
               {/* Passenger List */}
               <div className="mt-2 flex flex-wrap gap-1 overflow-y-auto custom-scrollbar"
@@ -911,7 +942,11 @@ window.location.href = data.payment_url;
                     <input
                       type="text"
                       value={currentPassenger.name || ''}
-                      onChange={(e) => setCurrentPassenger({ ...currentPassenger, name: e.target.value })}
+                      onChange={(e) => {
+                        // Only allow letters and spaces
+                        const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                        setCurrentPassenger({ ...currentPassenger, name: value });
+                      }}
                       placeholder="Name"
                       className={`flex-1 min-w-0 p-1 border rounded text-xs sm:text-sm ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                     />
@@ -921,12 +956,18 @@ window.location.href = data.payment_url;
                       value={currentPassenger.age ?? ''}
                       onChange={(e) => {
                         const value = e.target.value;
-                        setCurrentPassenger({
-                          ...currentPassenger,
-                          age: value === '' ? undefined : Number(value),
-                        });
+                        // Only allow numbers between 1 and 120
+                        const numValue = parseInt(value);
+                        if (value === '' || (numValue >= 1 && numValue <= 120)) {
+                          setCurrentPassenger({
+                            ...currentPassenger,
+                            age: value === '' ? undefined : numValue,
+                          });
+                        }
                       }}
                       placeholder="Age"
+                      min="1"
+                      max="120"
                       className={`w-12 sm:w-16 p-1 border rounded text-xs sm:text-sm appearance-none ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-700'}`}
                       style={{ MozAppearance: 'textfield' }}
                       onWheel={e => (e.target as HTMLInputElement).blur()}

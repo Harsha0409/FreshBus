@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { LoginModalProvider } from './context/loginModalContext';
@@ -8,7 +8,8 @@ import LoginModal from './components/LoginModal';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Chat } from './types/chat';
-import { useAuth } from './hooks/useAuth';
+import { authService } from './services/api';
+// Remove this line: import CookieDebugger from './CookieDebugger';
 
 const mockChats: Chat[] = [
   {
@@ -21,20 +22,63 @@ const mockChats: Chat[] = [
 
 function App() {
   const [chats, setChats] = useState<Chat[]>(mockChats);
+  const [initialAuthCheck, setInitialAuthCheck] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  useEffect(() => {
+    // Initial authentication check on app load
+    const checkAuth = async () => {
+      try {
+        console.log('[App] Starting initial auth check...');
+
+        // Perform full auth initialization
+        const isAuthenticated = await authService.initializeAuth();
+        console.log('[App] Initial auth result:', isAuthenticated);
+        
+        setShowLoginModal(!isAuthenticated);
+      } catch (error) {
+        console.error('Initial auth check failed:', error);
+        setShowLoginModal(true);
+      } finally {
+        setInitialAuthCheck(true);
+        console.log('[App] Initial auth check completed');
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // Don't render until initial auth check is complete
+  if (!initialAuthCheck) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
-      <AppContent chats={chats} setChats={setChats} />
+      <AppContent chats={chats} setChats={setChats} showLoginModal={showLoginModal} />
     </BrowserRouter>
   );
 }
 
-function AppContent({ chats, setChats }: { chats: Chat[]; setChats: React.Dispatch<React.SetStateAction<Chat[]>> }) {
-  const isAuthenticated = useAuth(); // Now useAuth is used within Router context
-
+function AppContent({ 
+  chats, 
+  setChats, 
+  showLoginModal 
+}: { 
+  chats: Chat[]; 
+  setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
+  showLoginModal: boolean;
+}) {
   return (
     <ThemeProvider>
-      <LoginModalProvider initialOpen={!isAuthenticated}>
+      <LoginModalProvider initialOpen={showLoginModal}>
         <Routes>
           <Route path="/" element={<Layout chats={chats} setChats={setChats} />} />
           <Route path="/c/:sessionId" element={<Layout chats={chats} setChats={setChats} />} />

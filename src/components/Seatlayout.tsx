@@ -52,6 +52,7 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({ bus, selectedSeats, onClose }) 
     // Wait for animation to complete before calling onClose
     setTimeout(() => onClose(), 300)
   }
+
   // Colors for seat layout (matching bus card colors)
   const Colors = {
     neutralGreyDisable: "#9ca3af",
@@ -60,10 +61,6 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({ bus, selectedSeats, onClose }) 
     yellow300: "#FDE047", // Tailwind yellow-300
     pink300: "#F9A8D4",   // Tailwind pink-300
   }
-
-
-
-
 
   // Generate vertical seat layout with sequential numbering starting from right
   // All seats are shown as available - only recommended seats will be highlighted
@@ -167,7 +164,6 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({ bus, selectedSeats, onClose }) 
   const getSeatProps = (seat: any) => {
     if (!seat) return {}
 
-
     // Check if this seat is in the selectedSeats (recommended seats from bus card)
     const isRecommendedSeat = selectedSeats.some(selectedSeat => 
       selectedSeat.seat_number.toString() === seat.number.toString() || selectedSeat.seat_id === seat.id
@@ -207,151 +203,54 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({ bus, selectedSeats, onClose }) 
   return (
     <div
       onClick={handleOverlayClick}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "transparent", // Remove dark overlay
-        padding: isLaptop ? "0 80px 0 0" : "0", // Add 80px gap from right edge on laptop
-        opacity: isVisible ? 1 : 0,
-        transition: "opacity 0.3s ease-in-out",
-      }}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-transparent transition-opacity duration-300 ease-in-out ${
+        isLaptop ? 'pr-20' : 'p-0'
+      } ${isVisible ? 'opacity-100' : 'opacity-0'}`}
     >
       <div
-        style={{
-          backgroundColor: "white",
-          borderRadius: "12px",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-          width: "fit-content",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          border: "2px solid #e5e7eb",
-          backdropFilter: "blur(2px)",
-          // Position towards right on laptop with margin
-          marginLeft: isLaptop ? "auto" : "0",
-          marginRight: isLaptop ? "0" : "0",
-          // Smooth animation styles
-          transform: isVisible 
-            ? "translateX(0) scale(1)" 
+        className={`bg-white rounded-xl shadow-2xl border-2 border-gray-200 backdrop-blur-sm max-h-[90vh] overflow-y-auto transition-all duration-300 cubic-bezier(0.4, 0, 0.2, 1) ${
+          isLaptop ? 'ml-auto mr-0' : 'ml-0 mr-0'
+        } ${
+          isVisible 
+            ? 'translate-x-0 scale-100 opacity-100' 
             : isLaptop 
-              ? "translateX(100px) scale(0.95)" 
-              : "translateY(50px) scale(0.95)",
-          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          opacity: isVisible ? 1 : 0,
-        }}
+              ? 'translate-x-[100px] scale-95 opacity-0' 
+              : 'translate-y-[50px] scale-95 opacity-0'
+        }`}
+        style={{ width: "fit-content" }}
       >
-        {/* Header with close button */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            opacity: isVisible ? 1 : 0,
-            transform: isVisible ? "translateY(0)" : "translateY(-10px)",
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s",
-          }}
-        >
-          <button
-            onClick={handleClose}
-            style={{
-              color: "#6b7280",
-              fontSize: "24px",
-              fontWeight: "bold",
-              width: "32px",
-              height: "32px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "50%",
-              border: "none",
-              backgroundColor: "transparent",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f3f4f6"
-              e.currentTarget.style.color = "#374151"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent"
-              e.currentTarget.style.color = "#6b7280"
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Seat Layout */}
         <div 
-          style={{ 
-            padding: "0 24px 24px 24px",
-            opacity: isVisible ? 1 : 0,
-            transform: isVisible ? "translateY(0)" : "translateY(20px)",
-            transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s", // Slight delay for stagger effect
-          }}
+          className={`transition-all duration-400 cubic-bezier(0.4, 0, 0.2, 1) delay-100 ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+          }`}
         >
           {/* Vertical seat grid */}
-          <div
-            style={{
-              backgroundColor: "#f9fafb",
-              padding: "32px",
-              borderRadius: "16px",
-              position: "relative",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            {/* Steering wheel positioned inside the box above seat 1 */}
-            <div
-              style={{
-                position: "absolute",
-                top: "10px",
-                right: "32px",
-                width: "30px",
-                height: "30px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+          <div className="bg-gray-50 p-6 rounded-2xl relative border border-gray-200">
+            {/* Steering wheel and close button container */}
+            <div className="absolute top-2 right-6 flex items-center gap-2">
               <img
                 src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-qKHaKjHQpLOsaxyBRMWHv8cr1h3MIZ.png"
                 alt="steering"
-                style={{ width: "30px", height: "30px" }}
+                className="w-6 h-6"
               />
+              <button
+                onClick={handleClose}
+                className="text-gray-500 text-xl font-bold w-6 h-6 flex items-center justify-center rounded-full border-none bg-transparent cursor-pointer transition-all duration-200 ease-in-out hover:bg-gray-100 hover:text-gray-700"
+              >
+                ×
+              </button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", marginTop: "20px" }}>
+            <div className="flex flex-col mt-5">
               {seatRows.map((row, rowIndex) => {
                 if (row === null) {
                   // Extra legroom space
                   return (
                     <div
                       key={`legroom-${rowIndex}`}
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        position: "relative",
-                        borderTop: "2px dashed #10b981",
-                        borderBottom: "2px dashed #10b981",
-                        margin: "10px 0",
-                      }}
+                      className="flex justify-center items-center relative border-t-2 border-b-2 border-dashed border-emerald-500 my-2.5"
                     >
-                      <div
-                        style={{
-                          color: "#10b981",
-                          fontSize: "12px",
-                          fontWeight: "500",
-                          backgroundColor: "white",
-                          padding: "4px 8px",
-                          borderRadius: "4px",
-                        }}
-                      >
+                      <div className="text-emerald-500 text-xs font-medium bg-white px-2 py-1 rounded">
                         Extra Legroom Space
                       </div>
                     </div>
@@ -366,43 +265,21 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({ bus, selectedSeats, onClose }) 
                 return (
                   <div
                     key={rowIndex}
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      gap: isNonReclinerRow ? "8px" : "6px", 
-                    }}
+                    className={`flex justify-center items-center ${
+                      isNonReclinerRow ? 'gap-2' : 'gap-1.5'
+                    }`}
                   >
                     {row.map((seat, seatIndex) => (
-                      <div key={seatIndex} style={{ display: "flex", justifyContent: "center", position: "relative" }}>
+                      <div key={seatIndex} className="flex justify-center relative">
                         {seat ? (
-                          <div style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                          <div className="relative flex justify-center items-center">
                             <SeatIcon {...getSeatProps(seat)} size={24} />
-                            <div
-                              style={{
-                                position: "absolute",
-                                fontSize: "8px",
-                                fontWeight: "700",
-                                color: "#374151",
-                                top: "50%",
-                                left: "50%",
-                                transform: "translate(-50%, -50%)",
-                                zIndex: 10,
-                              }}
-                            >
+                            <div className="absolute text-[8px] font-bold text-gray-700 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
                               {seat.number}
                             </div>
                           </div>
                         ) : (
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
+                          <div className="w-8 h-8 flex items-center justify-center">
                             {/* Just empty space - no aisle indicator */}
                           </div>
                         )}
@@ -414,44 +291,12 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({ bus, selectedSeats, onClose }) 
             </div>
 
             {/* Non-recliner section indicator */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginTop: "16px",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: "#dbeafe",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "1px solid #3b82f6",
-              }}
-            >
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  backgroundColor: "#3b82f6",
-                  borderRadius: "50%",
-                }}
-              ></div>
-              <span
-                style={{
-                  color: "#3b82f6",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                }}
-              >
+            <div className="flex justify-center mt-2 items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg border border-blue-500">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-blue-500 text-xs font-semibold">
                 Non-Recliner Seats (41-45)
               </span>
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  backgroundColor: "#3b82f6",
-                  borderRadius: "50%",
-                }}
-              ></div>
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
             </div>
           </div>
         </div>

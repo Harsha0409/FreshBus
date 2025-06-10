@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { authService } from '../services/api';
 
 // Add interface for passenger items
 interface Passenger {
@@ -14,8 +15,8 @@ function PaymentCallback() {
   const navigate = useNavigate();
   const [processingStatus, setProcessingStatus] = useState('Processing payment...');
   const [retryCount, setRetryCount] = useState(0);
-  const [hasProcessed, setHasProcessed] = useState(false); // Prevent duplicate processing
-  const MAX_RETRIES = 5; // Maximum number of retries for pending payments
+  const [hasProcessed, setHasProcessed] = useState(false);
+  const MAX_RETRIES = 5;
 
   console.log('[PaymentCallback] Component rendered/re-rendered');
 
@@ -49,22 +50,18 @@ function PaymentCallback() {
     // Parse user object from localStorage
     let userId = '';
     try {
-      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-      if (userStr) {
-        const userObj = JSON.parse(userStr);
-        userId = userObj.id?.toString() || '';
+      const user = authService.getUser();
+      if (user && user.id) {
+        userId = user.id.toString();
         console.log('Parsed user ID:', userId);
       }
     } catch (error) {
-      console.error('Error parsing user data:', error);
+      console.error('Error getting user data:', error);
     }
 
-    // Get access token with validation
-    const accessToken = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-    
-    // Validate required data
-    if (!accessToken) {
-      console.error('Access token not found');
+    // Check if user is authenticated (instead of checking tokens directly)
+    if (!authService.isAuthenticated()) {
+      console.error('User not authenticated');
       setProcessingStatus('Authentication error. Please login again.');
       return;
     }
@@ -75,8 +72,7 @@ function PaymentCallback() {
       return;
     }
 
-    // Debug logs for token and session
-    console.log('Access Token available:', !!accessToken);
+    // Debug logs for session
     console.log('Session ID:', sessionId);
     console.log('User Details:', { userId });
 
@@ -109,27 +105,18 @@ function PaymentCallback() {
           `Confirming payment... ${retryCount > 0 ? `(Attempt ${retryCount + 1}/${MAX_RETRIES})` : ''}`
         );
         
-        // Use a timeout to ensure we don't get stuck if the fetch takes too long
-        const confirmPromise = fetch(
+        // Use fetchWithRefresh for automatic token handling
+        const confirmResp = await authService.fetchWithRefresh(
           `/api/tickets/${apiOrderId}/confirm_payment`,
           {
             method: 'GET',
             headers: {
-              Authorization: `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
               'X-User-ID': userId,
               'X-Session-ID': sessionId
             },
           }
         );
-        
-        // Set a timeout for the fetch
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 10000)
-        );
-        
-        // Race between the fetch and the timeout
-        const confirmResp = await Promise.race([confirmPromise, timeoutPromise]) as Response;
 
         console.log('Confirm payment status:', confirmResp.status);
 
@@ -151,7 +138,7 @@ function PaymentCallback() {
               `Payment is being processed. Checking again in 3 seconds... (${retryCount + 1}/${MAX_RETRIES})`
             );
             setRetryCount((prev) => prev + 1);
-            setTimeout(processPayment, 3000); // Retry after 3 seconds
+            setTimeout(processPayment, 3000);
             return;
           } else {
             // Max retries reached
@@ -190,25 +177,18 @@ function PaymentCallback() {
           
           console.log(`[PaymentCallback] Making ticket_details API call for detailsId: ${detailsId}`);
           
-          // Set a timeout for the fetch
-          const detailsPromise = fetch(
+          // Use fetchWithRefresh for automatic token handling
+          const detailsResp = await authService.fetchWithRefresh(
             `/api/tickets/${detailsId}/ticket_details`,
             {
               method: 'GET',
               headers: {
-                Authorization: `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
                 'X-User-ID': userId,
                 'X-Session-ID': sessionId
               },
             }
           );
-          
-          // Race between the fetch and the timeout
-          const detailsResp = await Promise.race([
-            detailsPromise, 
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Request timeout')), 10000))
-          ]) as Response;
 
           console.log('Ticket details status:', detailsResp.status);
 
@@ -369,7 +349,7 @@ Thank you for choosing FreshBus. Stay fresh!
       console.error('Payment process failed:', error);
       setProcessingStatus('Payment failed. Please try again.');
     });
-  }, [hasProcessed]); // Add hasProcessed to dependencies
+  }, [hasProcessed]);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900 p-4">

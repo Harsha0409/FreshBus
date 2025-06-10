@@ -1,5 +1,6 @@
 const BASE_URL_CUSTOMER = '/api';
 console.log('BASE_URL_CUSTOMER:', BASE_URL_CUSTOMER);
+
 interface LoginResponse {
   token: string;
   user: {
@@ -22,7 +23,7 @@ export const authService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ mobile }),
-        credentials: 'include', // Include cookies for session management
+        credentials: 'include',
       });
 
       console.log('Response status:', response.status);
@@ -53,35 +54,74 @@ export const authService = {
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to verify OTP');
-      if (!data.token) throw new Error('Invalid response from server: Missing token');
 
-      // Fetch profile to get canonical user info
-      let profile = null;
-      try {
-        profile = await authService.getProfile();
-      } catch (profileError) {
-        console.error('Error fetching profile after login:', profileError);
-      }
+      console.log('OTP verification successful, received data:', data);
 
-      // Always store user as { id, name, mobile }
-      const userObj: { id: string | number; mobile: string; name?: string } = {
-        id: (profile && profile.id) || data.user?.id,
-        mobile:
-          (profile && (profile.mobile || profile.phone)) ||
-          data.user?.mobile ||
-          data.user?.phone ||
-          '',
-      };
-      const resolvedName =
-        (profile && profile.name) ||
-        data.user?.name ||
-        undefined;
-      if (resolvedName) userObj.name = resolvedName;
+      // Wait a moment for cookies to be set, then fetch profile
+      setTimeout(async () => {
+        try {
+          console.log('Fetching user profile after successful OTP verification...');
+          const profileResp = await fetch(`/api/auth/profile`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+          
+          if (profileResp.ok) {
+            const profile = await profileResp.json();
+            console.log('Profile fetched successfully:', profile);
+            
+            // Store user data in localStorage
+            const userObj = {
+              id: profile.id || profile.user_id || data.user?.id,
+              mobile: profile.mobile || profile.phone || data.user?.mobile || mobile,
+              name: profile.name || data.user?.name || null
+            };
+            
+            console.log('Storing user object:', userObj);
+            localStorage.setItem('user', JSON.stringify(userObj));
+            
+            // Set a flag to indicate we have valid authentication
+            localStorage.setItem('auth_validated', 'true');
+            
+            // Trigger storage event to update auth state
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new CustomEvent('auth:success'));
+            
+          } else {
+            console.error('Failed to fetch profile:', profileResp.status);
+            // If profile fetch fails but OTP was successful, store basic user data
+            if (data.user) {
+              const fallbackUserObj = {
+                id: data.user.id,
+                mobile: data.user.mobile || data.user.phone || mobile,
+                name: data.user.name || null
+              };
+              console.log('Storing fallback user object:', fallbackUserObj);
+              localStorage.setItem('user', JSON.stringify(fallbackUserObj));
+              localStorage.setItem('auth_validated', 'true');
+              window.dispatchEvent(new Event('storage'));
+              window.dispatchEvent(new CustomEvent('auth:success'));
+            }
+          }
+        } catch (profileError) {
+          console.error('Error fetching profile:', profileError);
+          // Fallback: store user data from verifyOTP response
+          if (data.user) {
+            const fallbackUserObj = {
+              id: data.user.id,
+              mobile: data.user.mobile || data.user.phone || mobile,
+              name: data.user.name || null
+            };
+            console.log('Storing fallback user object after error:', fallbackUserObj);
+            localStorage.setItem('user', JSON.stringify(fallbackUserObj));
+            localStorage.setItem('auth_validated', 'true');
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new CustomEvent('auth:success'));
+          }
+        }
+      }, 300);
 
-      localStorage.setItem('access_token', data.token);
-      localStorage.setItem('user', JSON.stringify(userObj));
-
-      return { ...data, profile: userObj };
+      return { ...data, profile: data.user };
     } catch (error: any) {
       console.error('Error in verifyOTP:', error.message);
       throw new Error(error.message || 'Failed to verify OTP');
@@ -97,7 +137,7 @@ export const authService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ mobile }),
-        credentials: 'include', // Include cookies for session management
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -125,10 +165,9 @@ export const authService = {
       }
       
       // Clear all auth-related items from localStorage
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
-      localStorage.removeItem('sessionId'); // Also remove session ID
+      localStorage.removeItem('sessionId');
+      localStorage.removeItem('auth_validated');
       
     } catch (error) {
       console.error('Error in logout:', (error as any).message);
@@ -138,80 +177,169 @@ export const authService = {
     }
   },
 
-  // Get Profile
+  // Get Profile with proper user data storage
   async getProfile(): Promise<any> {
     try {
       const response = await fetch(`/api/auth/profile`, {
         method: 'GET',
-        credentials: 'include', // Include cookies for session management
+        credentials: 'include',
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Session expired');
+        }
         throw new Error('Failed to get profile');
       }
 
-      return await response.json();
+      const profile = await response.json();
+      console.log('Profile data received:', profile);
+      
+      // Store/update user data whenever profile is fetched
+      const userObj = {
+        id: profile.id || profile.user_id,
+        mobile: profile.mobile || profile.phone,
+        name: profile.name || null
+      };
+      
+      if (userObj.id && userObj.mobile) {
+        console.log('Updating user data from profile:', userObj);
+        localStorage.setItem('user', JSON.stringify(userObj));
+        localStorage.setItem('auth_validated', 'true');
+      }
+
+      return profile;
     } catch (error: any) {
       console.error('Error in getProfile:', error.message);
+      if (error.message === 'Session expired') {
+        this.clearAuth();
+      }
       throw new Error(error.message || 'Failed to get profile');
     }
   },
 
   // Clear Authentication Data
   clearAuth() {
-    localStorage.removeItem('access_token');
     localStorage.removeItem('user');
-  },
-
-  // Get Token from LocalStorage
-  getToken(): string | null {
-    return localStorage.getItem('access_token');
+    localStorage.removeItem('sessionId');
+    localStorage.removeItem('auth_validated');
   },
 
   // Get User from LocalStorage
   getUser() {
     const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+      const user = userStr ? JSON.parse(userStr) : null;
+      console.log('[authService.getUser] User data:', user ? { id: user.id, mobile: user.mobile } : null);
+      return user;
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      localStorage.removeItem('user'); // Remove corrupted data
+      return null;
+    }
+  },
+
+  // Check if user is authenticated (using auth validation flag instead of cookies)
+  isAuthenticated(): boolean {
+    const user = this.getUser();
+    const authValidated = localStorage.getItem('auth_validated') === 'true';
+    
+    const result = !!(user && user.id && authValidated);
+    
+    console.log('[authService.isAuthenticated] Authentication check result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userMobile: user?.mobile,
+      authValidated: authValidated,
+      isAuthenticated: result
+    });
+    
+    return result;
+  },
+
+  // Test if we can make authenticated requests (since we can't read HttpOnly cookies)
+  async testAuthentication(): Promise<boolean> {
+    try {
+      const response = await fetch('/api/auth/profile', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      return response.ok;
+    } catch (error) {
+      console.error('Auth test failed:', error);
+      return false;
+    }
   },
 
   // Generic Fetch with Retry on 401
   async fetchWithRefresh(url: string, opts: RequestInit = {}): Promise<Response> {
-    let response = await fetch(url, { ...opts, credentials: 'include' });
+    // Ensure we always include credentials
+    const options = { ...opts, credentials: 'include' as RequestCredentials };
+    
+    let response = await fetch(url, options);
 
     if (response.status === 401) {
-      // Refresh token and retry
-      const refreshed = await this.refreshToken();
-      if (!refreshed) {
-        alert('Session expired—please login again');
-        window.location.reload();
-        return Promise.reject(new Error('Session expired'));
-      }
-
-      // Retry the original request
-      response = await fetch(url, { ...opts, credentials: 'include' });
+      console.log('Access token expired, clearing auth state...');
+      this.clearAuth();
+      // Trigger login modal
+      window.dispatchEvent(new CustomEvent('auth:required'));
+      return Promise.reject(new Error('Session expired'));
     }
 
     return response;
   },
 
-  // Refresh Token
-  async refreshToken(): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/auth/refresh-token`, {
-        method: 'GET',
-        credentials: 'include', // Include cookies for session management
-      });
+  // Initialize authentication check with HttpOnly cookies
+  async initializeAuth(): Promise<boolean> {
+    console.log('[authService.initializeAuth] Starting initialization...');
+    
+    const user = this.getUser();
+    const authValidated = localStorage.getItem('auth_validated') === 'true';
 
-      if (!response.ok) {
+    console.log('[authService.initializeAuth] Initial check:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userMobile: user?.mobile,
+      authValidated: authValidated
+    });
+
+    // If we have user data and auth validation flag, test if we're still authenticated
+    if (user && user.id && authValidated) {
+      console.log('[authService.initializeAuth] Testing authentication with server...');
+      const isValid = await this.testAuthentication();
+      
+      if (isValid) {
+        console.log('[authService.initializeAuth] Authentication test passed - user authenticated');
+        return true;
+      } else {
+        console.log('[authService.initializeAuth] Authentication test failed - clearing auth');
+        this.clearAuth();
         return false;
       }
-
-      const data = await response.json();
-      localStorage.setItem('access_token', data.token);
-      return true;
-    } catch (error) {
-      console.error('Error in refreshToken:', error);
-      return false;
     }
+
+    // If we have no user data but want to test for existing session
+    if (!user && !authValidated) {
+      console.log('[authService.initializeAuth] No local auth data, testing for existing session...');
+      const isValid = await this.testAuthentication();
+      
+      if (isValid) {
+        console.log('[authService.initializeAuth] Found valid session, fetching profile...');
+        try {
+          await this.getProfile();
+          const updatedUser = this.getUser();
+          if (updatedUser && updatedUser.id) {
+            console.log('[authService.initializeAuth] Profile fetched successfully - user authenticated');
+            return true;
+          }
+        } catch (error) {
+          console.error('[authService.initializeAuth] Failed to fetch profile despite valid session:', error);
+        }
+      }
+    }
+
+    console.log('[authService.initializeAuth] User not authenticated');
+    return false;
   },
 };

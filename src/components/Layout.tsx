@@ -30,23 +30,27 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedChatId, setSelectedChatId] = useState<string>('1');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const isAuthenticated = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [showLogout, setShowLogout] = useState(false);
+  
+  // Add loading states and processed sessions to prevent loops
+  const [loadingStates, setLoadingStates] = useState<Set<string>>(new Set());
+  const [processedSessions, setProcessedSessions] = useState<Set<string>>(new Set());
+  const [initialLoad, setInitialLoad] = useState(false);
 
   const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>();
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Helper wrappers
+  // Helper wrappers with memoization
   const createNewSessionHelper = useCallback(
     () => createNewSession(setChats, setSelectedChatId, navigate),
-    [setChats, setSelectedChatId, navigate]
+    [setChats, navigate]
   );
 
   const handleSendMessageHelper = useCallback(
     (content: string) => {
-      // Continue with the original message handling logic
       handleSendMessage(
         content,
         selectedChatId,
@@ -57,35 +61,60 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
     },
     [selectedChatId, setChats, location.pathname, createNewSessionHelper]
   );
+
   const handleNewChatHelper = useCallback(
-    () =>
+    () => {
+      setProcessedSessions(new Set()); // Clear processed sessions for new chat
       handleNewChat(
         chats,
         selectedChatId,
         setChats,
         setSelectedChatId,
         navigate
-      ),
-    [chats, selectedChatId, setChats, setSelectedChatId, navigate]
+      );
+    },
+    [chats, selectedChatId, setChats, navigate]
   );
 
   const loadConversationHelper = useCallback(
-    (conversationId: string) =>
-      loadConversation(
-        conversationId,
-        setChats,
-        setSelectedChatId,
-        navigate,
-        location.pathname
-      ),
-    [setChats, setSelectedChatId, navigate, location.pathname]
+    async (conversationId: string) => {
+      // Prevent multiple simultaneous loads of the same conversation
+      if (loadingStates.has(conversationId)) {
+        console.log('[Layout] Already loading conversation:', conversationId);
+        return;
+      }
+      
+      setLoadingStates(prev => new Set(prev).add(conversationId));
+      
+      try {
+        await loadConversation(
+          conversationId,
+          setChats,
+          setSelectedChatId,
+          navigate,
+          location.pathname
+        );
+      } catch (error) {
+        console.error('Error loading conversation:', error);
+      } finally {
+        setLoadingStates(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(conversationId);
+          return newSet;
+        });
+      }
+    },
+    [setChats, navigate, location.pathname]
   );
 
+  // Simple session ID effect
   useEffect(() => {
-    if (sessionId) setSelectedChatId(sessionId);
+    if (sessionId) {
+      setSelectedChatId(sessionId);
+    }
   }, [sessionId]);
 
-  // Add this effect in Layout.tsx near your other useEffect hooks
+  // Payment status check effect
   useEffect(() => {
     // Check for payment status when chat loads or changes
     const paymentStatusStr = localStorage.getItem('paymentStatus');
@@ -124,8 +153,6 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
               return chat;
             }));
 
-            // TODO: Save the ticket confirmation to backend for persistence
-            // For now, the ticket confirmation will only persist in the current session
             console.log('[Layout] Ticket confirmation added to local chat state');
 
             // Remove the payment status from localStorage after using it
@@ -139,27 +166,89 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
     }
   }, [selectedChatId, setChats]);
 
+  // Main session handling effect with proper guards
   useEffect(() => {
+    // Don't process if auth is still loading
+    if (authLoading) {
+      console.log('[Layout] Auth still loading, skipping session processing');
+      return;
+    }
+
+    // Mark that we've done initial load check
+    if (!initialLoad) {
+      setInitialLoad(true);
+      console.log('[Layout] Initial load marked as complete');
+    }
+
     if (urlSessionId) {
+      // Prevent processing the same session multiple times
+      if (processedSessions.has(urlSessionId)) {
+        console.log('[Layout] Session already processed:', urlSessionId);
+        return;
+      }
+
+      console.log('[Layout] Processing session:', urlSessionId);
+      
+      // Mark this session as being processed
+      setProcessedSessions(prev => new Set(prev).add(urlSessionId));
+      
       setSelectedChatId(urlSessionId);
       localStorage.setItem('sessionId', urlSessionId);
 
       const chatExists = chats.some(chat => chat.id === urlSessionId);
       console.log('[Layout] Chat exists for session:', urlSessionId, chatExists);
+      
       if (!chatExists && isAuthenticated) {
         console.log('[Layout] Loading conversation for session:', urlSessionId);
         loadConversationHelper(urlSessionId);
       }
-    } else if (isAuthenticated) {
+    } else if (isAuthenticated && initialLoad) {
+      // Only handle navigation after initial load is complete and user is authenticated
       const storedSessionId = localStorage.getItem('sessionId');
-      if (storedSessionId) {
+      if (storedSessionId && location.pathname === '/') {
+        console.log('[Layout] Redirecting to stored session:', storedSessionId);
         navigate(`/c/${storedSessionId}`, { replace: true });
-      } else if (location.pathname === '/') {
+      } else if (location.pathname === '/' && !storedSessionId) {
+        console.log('[Layout] Creating new session for authenticated user');
         createNewSessionHelper();
       }
     }
-  }, [urlSessionId, isAuthenticated, chats, navigate, location.pathname, createNewSessionHelper, loadConversationHelper]);
+  }, [
+    urlSessionId, 
+    isAuthenticated, 
+    authLoading, 
+    chats, 
+    navigate, 
+    location.pathname, 
+    createNewSessionHelper, 
+    loadConversationHelper,
+    initialLoad
+  ]);
 
+  // Clear processed sessions when session ID changes significantly
+  useEffect(() => {
+    if (urlSessionId && !processedSessions.has(urlSessionId)) {
+      // If we have a new sessionId that hasn't been processed, clear the processed set
+      setProcessedSessions(new Set());
+    }
+  }, [urlSessionId]);
+
+  // Listen for auth success events to reset loading states
+  useEffect(() => {
+    const handleAuthSuccess = () => {
+      console.log('[Layout] Auth success event received, resetting states');
+      setProcessedSessions(new Set());
+      setInitialLoad(false); // Reset initial load to reprocess
+    };
+
+    window.addEventListener('auth:success', handleAuthSuccess);
+    
+    return () => {
+      window.removeEventListener('auth:success', handleAuthSuccess);
+    };
+  }, []);
+
+  // Scroll to bottom effects
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedChatId, chats]);
@@ -169,6 +258,18 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedChat?.messages]);
+
+  // Show loading state while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[100dvh] flex flex-col bg-[var(--color-app-bg)] text-[var(--color-text)] overflow-hidden">
@@ -251,12 +352,17 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
               {showLogout && (
                 <button
                   onClick={async () => {
-                    await authService.logout();
-                    window.dispatchEvent(new Event("storage"));
-                    toast.success("Logged out successfully!");
-                    setShowLogout(false);
-                    navigate('/', { replace: true });
-                    window.location.reload();
+                    try {
+                      await authService.logout();
+                      window.dispatchEvent(new Event("storage"));
+                      toast.success("Logged out successfully!");
+                      setShowLogout(false);
+                      navigate('/', { replace: true });
+                      window.location.reload();
+                    } catch (error) {
+                      console.error('Logout error:', error);
+                      toast.error('Failed to logout');
+                    }
                   }}
                   className={`absolute top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 ${theme === "dark"
                     ? "bg-[#FBE822] text-[#1765F3] hover:bg-[#fcef4d]"
@@ -302,8 +408,8 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
             onNewChat={handleNewChatHelper}
             onLoadConversation={loadConversationHelper}
           />
-          <div className="flex-1 flex flex-col items-center justify-center" >
-            {(chats[0].messages.length === 0) ? (
+          <div className="flex-1 flex flex-col items-center justify-center">
+            {(selectedChat?.messages.length === 0 || !selectedChat) ? (
               <div className="flex flex-col items-center justify-center w-[90%] gap-1">
                 <Logo className="h-16 w-auto" />
                 <div className="flex items-center justify-center font-semibold text-base sm:text-lg">
@@ -337,7 +443,6 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                   className="bg-[var(--color-app-bg)] fixed left-0 bottom-0 w-full flex items-center justify-center"
                   style={{
                     height: '4.5rem',
-
                   }}
                 >
                   <div className="w-[98%] sm:w-[75%] mx-auto px-2 sm:px-4 lg:px-6 flex items-center h-full">

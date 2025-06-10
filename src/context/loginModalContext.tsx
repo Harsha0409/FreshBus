@@ -1,31 +1,62 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authService } from '../services/api';
 
 interface LoginModalContextType {
-    isOpen: boolean;
-    onOpen: () => void;
-    onClose: () => void;
+  isOpen: boolean;
+  onOpen: () => void;
+  onClose: () => void;
 }
 
 const LoginModalContext = createContext<LoginModalContextType | undefined>(undefined);
 
-interface LoginModalProviderProps {
+export function LoginModalProvider({ 
+  children, 
+  initialOpen = false 
+}: { 
   children: React.ReactNode;
   initialOpen?: boolean;
-}
-
-export const LoginModalProvider: React.FC<LoginModalProviderProps> = ({ children, initialOpen = false }) => {
+}) {
   const [isOpen, setIsOpen] = useState(initialOpen);
-  
+
   useEffect(() => {
-    // Check if user is authenticated
-    const token = localStorage.getItem('access_token');
-    const user = localStorage.getItem('user');
+    // Listen for custom login required events
+    const handleLoginRequired = () => {
+      setIsOpen(true);
+    };
+
+    const handleAuthRequired = () => {
+      setIsOpen(true);
+    };
+
+    window.addEventListener('login:required', handleLoginRequired);
+    window.addEventListener('auth:required', handleAuthRequired);
     
-    // Close modal if user is authenticated
-    if (token && user) {
-      setIsOpen(false);
+    return () => {
+      window.removeEventListener('login:required', handleLoginRequired);
+      window.removeEventListener('auth:required', handleAuthRequired);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Check auth status on mount only if initialOpen is true
+    if (initialOpen) {
+      const checkInitialAuth = async () => {
+        try {
+          const isAuthenticated = await authService.initializeAuth();
+          if (!isAuthenticated) {
+            setIsOpen(true);
+          } else {
+            setIsOpen(false);
+          }
+        } catch (error) {
+          console.error('Error checking initial auth:', error);
+          setIsOpen(true);
+        }
+      };
+
+      checkInitialAuth();
     }
-  }, []); // Empty dependency array means this runs once on mount
+  }, [initialOpen]);
 
   const onOpen = () => setIsOpen(true);
   const onClose = () => setIsOpen(false);
@@ -35,12 +66,12 @@ export const LoginModalProvider: React.FC<LoginModalProviderProps> = ({ children
       {children}
     </LoginModalContext.Provider>
   );
-};
+}
 
 export function useLoginModal() {
-    const context = useContext(LoginModalContext);
-    if (context === undefined) {
-        throw new Error('useLoginModal must be used within a LoginModalProvider');
-    }
-    return context;
+  const context = useContext(LoginModalContext);
+  if (context === undefined) {
+    throw new Error('useLoginModal must be used within a LoginModalProvider');
+  }
+  return context;
 }

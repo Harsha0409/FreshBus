@@ -1,11 +1,12 @@
 import { Chat, Message } from '../types/chat';
 import { toast } from 'react-toastify';
 import { authService } from '../services/api';
+import { NavigateFunction } from 'react-router-dom';
 
 export function createNewSession(
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
   setSelectedChatId: (id: string) => void,
-  navigate: (path: string) => void
+  navigate: NavigateFunction
 ) {
   const newChat: Chat = {
     id: Date.now().toString(),
@@ -28,15 +29,12 @@ export async function handleSendMessage(
   locationPathname: string,
   createNewSessionHelper: () => string
 ) {
-  const userStr = localStorage.getItem('user');
-  let user: { id?: string; name?: string; mobile?: string } = {};
-  try {
-    user = userStr && userStr !== "undefined" ? JSON.parse(userStr) : {};
-  } catch {
-    user = {};
-  }
-  if (!user.id || !user.mobile) {
+  const user = authService.getUser();
+  
+  if (!user?.id || !user?.mobile) {
     toast.error("Please login to chat.");
+    // Trigger login modal
+    window.dispatchEvent(new CustomEvent('login:required'));
     return;
   }
 
@@ -84,30 +82,14 @@ export async function handleSendMessage(
     )
   );
 
-  // --- Added: Send query to backend ---
   try {
     const session_id = localStorage.getItem('sessionId');
-    const accessToken = localStorage.getItem('access_token');
-    const refreshToken = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('refresh_token='))
-      ?.split('=')?.[1];
 
-    // Validate tokens before making the request
-    if (!accessToken) {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        // Try to refresh the token
-        const refreshed = await authService.refreshToken();
-        if (!refreshed) {
-          toast.error("Session expired. Please login again.");
-          authService.clearAuth(); // Clear stored auth data
-          return;
-        }
-      } else {
-        toast.error("Please login to continue");
-        return;
-      }
+    // Check authentication before making request
+    if (!authService.isAuthenticated()) {
+      toast.error("Please login to continue");
+      window.dispatchEvent(new CustomEvent('login:required'));
+      return;
     }
 
     const body = {
@@ -120,43 +102,16 @@ export async function handleSendMessage(
 
     const headers = new Headers({
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('access_token')}`, // Get fresh token
       'X-User-ID': user.id?.toString() || '',
       'X-Session-ID': session_id || ''
     });
 
-    if (refreshToken) {
-      headers.append('X-Refresh-Token', refreshToken);
-    }
-
-    const response = await fetch('/api/query', {
+    // Use fetchWithRefresh which handles token refresh automatically
+    const response = await authService.fetchWithRefresh('/api/query', {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      credentials: 'include' // Important: include cookies in request
     });
-
-    if (response.status === 401) {
-      // Try to refresh the token
-      const refreshed = await authService.refreshToken();
-      if (!refreshed) {
-        toast.error("Session expired. Please login again.");
-        authService.clearAuth(); // Clear stored auth data
-        return;
-      }
-      // Retry the request with new token
-      return handleSendMessage(content, selectedChatId, setChats, locationPathname, createNewSessionHelper);
-    }
-
-    // Handle authentication errors
-    if (response.status === 401) {
-      const errorData = await response.json();
-      toast.error(errorData.message || "Session expired. Please login again.");
-      // Clear invalid tokens
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      return;
-    }
 
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
@@ -234,7 +189,13 @@ export async function handleSendMessage(
           : chat
       )
     );
-    toast.error(error.message || 'Failed to send message');
+    
+    if (error.message === 'Session expired') {
+      toast.error('Session expired. Please login again.');
+      window.dispatchEvent(new CustomEvent('login:required'));
+    } else {
+      toast.error(error.message || 'Failed to send message');
+    }
   }
 }
 
@@ -243,7 +204,7 @@ export function handleNewChat(
   selectedChatId: string,
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
   setSelectedChatId: (id: string) => void,
-  navigate: (path: string) => void
+  navigate: NavigateFunction
 ) {
   const currentChat = chats.find(chat => chat.id === selectedChatId);
 
@@ -272,33 +233,88 @@ export async function loadConversation(
   conversationId: string,
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
   setSelectedChatId: (id: string) => void,
-  navigate: (path: string) => void,
+  navigate: NavigateFunction,
   locationPathname: string
 ) {
   try {
-    const userStr = localStorage.getItem('user');
-    let user: { id?: string; name?: string; mobile?: string } = {};
-    try {
-      user = userStr && userStr !== "undefined" ? JSON.parse(userStr) : {};
-    } catch {
-      user = {};
-    }
+    const user = authService.getUser();
 
-    if (!user.id) {
+    if (!user?.id) {
       toast.error("User not found");
       return;
     }
+
+    console.log(`[loadConversation] Loading conversation: ${conversationId}`);
 
     const historyResponse = await authService.fetchWithRefresh(
       `/api/history?user_id=${user.id}&session_id=${conversationId}`
     );
 
     if (!historyResponse.ok) {
-      throw new Error('Failed to fetch conversation history');
+      if (historyResponse.status === 404) {
+        console.log(`[loadConversation] Conversation ${conversationId} not found, creating empty chat`);
+        
+        // Create empty chat for new conversation
+        const newChat: Chat = {
+          id: conversationId,
+          title: 'New Conversation',
+          messages: [],
+          lastUpdated: new Date()
+        };
+
+        setChats(prevChats => {
+          const exists = prevChats.some(c => c.id === conversationId);
+          if (!exists) {
+            return [newChat, ...prevChats];
+          }
+          return prevChats;
+        });
+
+        setSelectedChatId(conversationId);
+        localStorage.setItem('sessionId', conversationId);
+        
+        if (locationPathname !== `/c/${conversationId}`) {
+          navigate(`/c/${conversationId}`, { replace: true });
+        }
+        
+        return;
+      }
+      throw new Error(`Failed to fetch conversation history: ${historyResponse.status}`);
     }
 
     const historyData = await historyResponse.json();
     console.log('[loadConversation] Raw history data:', historyData);
+
+    // Handle empty history
+    if (!historyData.history || historyData.history.length === 0) {
+      console.log(`[loadConversation] Empty history for conversation: ${conversationId}`);
+      
+      const emptyChat: Chat = {
+        id: conversationId,
+        title: 'Empty Conversation',
+        messages: [],
+        lastUpdated: new Date()
+      };
+
+      setChats(prevChats => {
+        const exists = prevChats.some(c => c.id === conversationId);
+        if (!exists) {
+          return [emptyChat, ...prevChats];
+        }
+        return prevChats.map(c =>
+          c.id === conversationId ? emptyChat : c
+        );
+      });
+
+      setSelectedChatId(conversationId);
+      localStorage.setItem('sessionId', conversationId);
+
+      if (locationPathname !== `/c/${conversationId}`) {
+        navigate(`/c/${conversationId}`, { replace: true });
+      }
+      
+      return;
+    }
 
     const formattedMessages: Message[] = historyData.history
       .filter((msg: any) => msg.role !== 'meta')
@@ -325,14 +341,14 @@ export async function loadConversation(
           id: `${conversationId}-${index}`,
           role: msg.role as 'user' | 'assistant',
           content: content,
-          timestamp: new Date(),
+          timestamp: new Date(msg.timestamp || Date.now()),
           isLoading: false
         };
       });
 
     const loadedChat: Chat = {
       id: conversationId,
-      title: 'Loaded Conversation',
+      title: formattedMessages.length > 0 ? 'Loaded Conversation' : 'Empty Conversation',
       messages: formattedMessages,
       lastUpdated: new Date()
     };
@@ -352,12 +368,18 @@ export async function loadConversation(
     localStorage.setItem('sessionId', conversationId);
 
     if (locationPathname !== `/c/${conversationId}`) {
-      navigate(`/c/${conversationId}`);
+      navigate(`/c/${conversationId}`, { replace: true });
     }
 
-    toast.success('Conversation loaded successfully');
+    console.log(`[loadConversation] Successfully loaded conversation: ${conversationId} with ${formattedMessages.length} messages`);
   } catch (error) {
-    toast.error('Failed to load conversation');
+    console.error('[loadConversation] Error:', error);
+    if (error instanceof Error && error.message === 'Session expired') {
+      toast.error('Session expired. Please login again.');
+      window.dispatchEvent(new CustomEvent('login:required'));
+    } else {
+      toast.error('Failed to load conversation');
+    }
   }
 }
 

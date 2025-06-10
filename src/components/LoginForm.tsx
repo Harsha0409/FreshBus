@@ -10,7 +10,7 @@ export default function LoginForm() {
     const [otp, setOtp] = useState('');
     const [isOtpSent, setIsOtpSent] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [isResending, setIsResending] = useState(false); // State for resend OTP button
+    const [isResending, setIsResending] = useState(false);
     const { theme } = useTheme();
     const { onClose } = useLoginModal();
     const navigate = useNavigate();
@@ -36,7 +36,7 @@ export default function LoginForm() {
     const handleResendOTP = async () => {
         setIsResending(true);
         try {
-            await authService.sendOTP(mobileNumber); // Reuse the sendOTP API
+            await authService.sendOTP(mobileNumber);
             toast.success('OTP resent successfully!');
         } catch (error: any) {
             toast.error(error.message || 'Failed to resend OTP');
@@ -55,17 +55,18 @@ export default function LoginForm() {
         try {
             await authService.verifyOTP(mobileNumber, otp);
             
+            toast.success('Login successful!');
+            onClose(); // Close modal after login
+            
             // Create a new session ID after login
             const newSessionId = Date.now().toString();
             localStorage.setItem('sessionId', newSessionId);
             
-            toast.success('Login successful!');
-            onClose(); // Close modal after login
-            
             // Navigate to new session URL
             navigate(`/c/${newSessionId}`);
             
-            window.dispatchEvent(new Event('storage')); // Trigger auth state update
+            // Note: auth:success event is now dispatched from authService.verifyOTP
+            
         } catch (error: any) {
             toast.error(error.message);
         } finally {
