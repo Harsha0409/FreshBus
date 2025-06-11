@@ -138,7 +138,7 @@ export function ChatMessage({ message, onBook, selectedChatId, setChats }: ChatM
       <div className="flex justify-start items-start py-1 mb-4 gap-1">
         <div className="flex-1 ml-2 text-left">
           <div className="flex items-center gap-1 justify-between">
-            <span className="font-medium text-gray-900 dark:text-gray-100">
+            <span className="font-medium text-gray-900 dark:text-gray-100"> c
               <span className="text-[#1765f3] dark:text-[#fbe822]">Ṧ</span>.AI
             </span>
           </div>
