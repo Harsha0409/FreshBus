@@ -1,4 +1,4 @@
-import { Bus, Seat } from '../types/chat';
+import { Bus, Seat, GreenCoins, FreshCard, FinalFareCalculation } from '../types/chat';
 
 // Define valid category literals
 export type CategoryType = 'Premium' | 'Reasonable' | 'Budget-Friendly';
@@ -167,6 +167,7 @@ export function calculateCategoryFare(seats: Seat[]): {
 }
 
 export interface Passenger {
+  id?: number;
   name: string;
   age: number | undefined;
   gender: string;
@@ -200,23 +201,61 @@ export function createPaymentPayload(
   selectedSeats: Seat[], 
   passengerDetails: Passenger[],
   selectedBoarding: string | null,
-  selectedDropping: string | null
+  selectedDropping: string | null,
+  appliedGreenCoins: number = 0,
+  appliedFreshCard: boolean = false,
+  freshCard: FreshCard | null = null,
+  finalFareCalculation?: FinalFareCalculation
 ) {
   // Parse user data from localStorage
-  const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
-  const mobile = userData?.mobile || ''; // Safely extract the mobile number
+  let mobile = '';
+  try {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const userData = JSON.parse(userStr);
+      mobile = userData.mobile || '';
+    }
+  } catch (e) {
+    console.error('Error parsing user data:', e);
+  }
 
-  console.log('Extracted mobile number:', mobile); // Debugging log
+  console.log('Extracted mobile number:', mobile);
 
-  // Calculate total fare
-  const totalFare = selectedSeats.reduce(
-    (total, seat) =>
-      total +
-      (seat.fare_details?.['Base Fare'] || 0) +
-      (seat.fare_details?.GST || 0) +
-      (seat.fare_details?.Discount || 0),
-    0
-  );
+  // Use provided final fare calculation or calculate here
+  let actualGreenCoinsUsed = 0;
+  let finalAmount = 0;
+  
+  if (finalFareCalculation) {
+    actualGreenCoinsUsed = finalFareCalculation.greenCoinsDiscount;
+    finalAmount = finalFareCalculation.total;
+  } else {
+    // Fallback calculation
+    const totalFare = selectedSeats.reduce(
+      (total, seat) =>
+        total +
+        (seat.fare_details?.['Base Fare'] || 0) +
+        (seat.fare_details?.GST || 0) +
+        (seat.fare_details?.Discount || 0),
+      0
+    );
+    
+    let remainingAmount = totalFare;
+    
+    // Apply green coins first
+    if (appliedGreenCoins > 0) {
+      actualGreenCoinsUsed = Math.min(appliedGreenCoins, remainingAmount);
+      remainingAmount -= actualGreenCoinsUsed;
+    }
+    
+    // Then apply fresh card discount to remaining amount
+    if (appliedFreshCard && freshCard) {
+      const freshCardDiscount = Math.min(freshCard.discountAmount, remainingAmount);
+      remainingAmount -= freshCardDiscount;
+    }
+    
+    // Ensure minimum payment amount
+    finalAmount = Math.max(1, remainingAmount);
+  }
 
   // Prepare the payload
   const payload = {
@@ -226,22 +265,32 @@ export function createPaymentPayload(
       passenger_age: passenger.age,
       seat_id: selectedSeats[index].seat_id,
       passenger_name: passenger.name,
-      gender: passenger.gender,
+      passenger_gender: passenger.gender,
     })),
     trip_id: bus.tripID,
     boarding_point_id: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.boarding_point_id,
     dropping_point_id: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.dropping_point_id,
     boarding_point_time: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.currentTime,
     dropping_point_time: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.currentTime,
-    total_collect_amount: totalFare.toFixed(2),
+    total_collect_amount: finalAmount.toFixed(2),
     main_category: 1,
-    freshcardId: 1,
-    freshcard: false,
+    freshcardId: appliedFreshCard && freshCard ? freshCard.id : null,
+    freshcard: appliedFreshCard,
+    green_coins_used: actualGreenCoinsUsed, // Send the actual amount used, not the applied amount
     return_url: `${window.location.origin}/payment/callback?session_id=${localStorage.getItem('sessionId')}`,
   };
 
+  // Validation checks
+  if (!mobile) {
+    throw new Error('Mobile number is required for booking');
+  }
+
   // Debugging: Log the payload
-  console.log('Payload:', payload);
+  console.log('Payload with discounts:', payload);
+  console.log('Applied green coins (user input):', appliedGreenCoins);
+  console.log('Actual green coins used (sent to backend):', actualGreenCoinsUsed);
+  console.log('Applied fresh card:', appliedFreshCard);
+  console.log('Final amount:', finalAmount);
   
   return payload;
 }
@@ -249,3 +298,6 @@ export function createPaymentPayload(
 export function validatePassengerDetails(passengerDetails: Passenger[]): boolean {
   return !passengerDetails.some((passenger) => !passenger.name || !passenger.age || !passenger.gender);
 }
+
+// Export the interfaces
+export type { GreenCoins, FreshCard, FinalFareCalculation };

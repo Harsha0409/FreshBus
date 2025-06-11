@@ -7,9 +7,10 @@ export interface Message {
   busRoutes?: Bus[];
   rawData?: any;
   isLoading?: boolean;
-  ticketData?: any; // You can type this more strictly if you have a TicketData interface
+  ticketData?: any;
   passengerData?: Passenger[];
 }
+
 export interface Chat {
   id: string;
   title: string;
@@ -67,7 +68,6 @@ export interface BoardingPoint {
     id: number;
     name: string;
     landmark: string;
-    // Optional fields (add if present in your backend)
     stationId?: number;
     latitude?: number;
     longitude?: number;
@@ -82,7 +82,6 @@ export interface DroppingPoint {
     id: number;
     name: string;
     landmark: string;
-    // Optional fields (add if present in your backend)
     stationId?: number;
     latitude?: number;
     longitude?: number;
@@ -113,14 +112,48 @@ export interface Bus {
 }
 
 export interface Passenger {
+  id?: number;
   name: string;
-  age: number | string;
+  age: number;
   gender: string;
-  seat: string | number;
+  seat?: string | number;
 }
 
-// If you want to type the full backend response:
+export interface GreenCoins {
+  available: number;
+  total_accrued: number;
+  total_used: number;
+}
+
+export interface FreshCard {
+  available: boolean;
+  id: number;
+  name: string;
+  fare: number;
+  tickets: number;
+  discountAmount: number;
+  usage: number;
+  active: boolean;
+  expiresInDays: number;
+  balance: number;
+  campaignName: string;
+  total_used: number;
+  total_accrued: number;
+  total_consumed: number;
+}
+
+export interface FinalFareCalculation {
+  baseFare: number;
+  gst: number;
+  discount: number;
+  greenCoinsDiscount: number;
+  freshCardDiscount: number;
+  total: number;
+}
+
 export interface BusQueryResponse {
   recommendations: Bus[];
   passengers: Passenger[];
+  green_coins: GreenCoins;
+  freshcard: FreshCard;
 }

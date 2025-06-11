@@ -1,4 +1,3 @@
-// BusCard.tsx
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { toast } from 'react-toastify';
@@ -11,7 +10,11 @@ import {
   convertToIST,
   getSeatBackgroundColor,
   Passenger,
-  getSeatGender
+  getSeatGender,
+  GreenCoins,
+  FreshCard,
+  createPaymentPayload,
+  FinalFareCalculation
 } from '../utils/busUtils';
 import ReactDOM from 'react-dom';
 import SeatLayout from './Seatlayout';
@@ -32,33 +35,39 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [isSeatLayoutOpen, setIsSeatLayoutOpen] = useState(false);
   
+  // Green Coins and Fresh Card state
+  const [greenCoins, setGreenCoins] = useState<GreenCoins | null>(null);
+  const [freshCard, setFreshCard] = useState<FreshCard | null>(null);
+  const [appliedGreenCoins, setAppliedGreenCoins] = useState(0);
+  const [appliedFreshCard, setAppliedFreshCard] = useState(false);
+  
   // Boarding and dropping points
-const [selectedBoarding, setSelectedBoarding] = useState<string | null>(
-  (() => {
-    // Try to match recommended to allBoardingPoints
-    if (bus.recommended_boarding_points?.length) {
-      const match = bus.allBoardingPoints.find(bp =>
-        bp.boarding_point.name === bus.recommended_boarding_points?.[0]?.name
-      );
-      if (match) return match.boarding_point.name;
-    }
-    // Fallback to first allBoardingPoints
-    return bus.allBoardingPoints[0]?.boarding_point.name || null;
-  })()
-);
-const [selectedDropping, setSelectedDropping] = useState<string | null>(
-  (() => {
-    // Try to match recommended to allDroppingPoints
-    if (bus.recommended_dropping_points?.length) {
-      const match = bus.allDroppingPoints.find(dp =>
-        dp.dropping_point.name === bus.recommended_dropping_points?.[0]?.name
-      );
-      if (match) return match.dropping_point.name;
-    }
-    // Fallback to first allDroppingPoints
-    return bus.allDroppingPoints[0]?.dropping_point.name || null;
-  })()
-);
+  const [selectedBoarding, setSelectedBoarding] = useState<string | null>(
+    (() => {
+      // Try to match recommended to allBoardingPoints
+      if (bus.recommended_boarding_points?.length) {
+        const match = bus.allBoardingPoints.find(bp =>
+          bp.boarding_point.name === bus.recommended_boarding_points?.[0]?.name
+        );
+        if (match) return match.boarding_point.name;
+      }
+      // Fallback to first allBoardingPoints
+      return bus.allBoardingPoints[0]?.boarding_point.name || null;
+    })()
+  );
+  const [selectedDropping, setSelectedDropping] = useState<string | null>(
+    (() => {
+      // Try to match recommended to allDroppingPoints
+      if (bus.recommended_dropping_points?.length) {
+        const match = bus.allDroppingPoints.find(dp =>
+          dp.dropping_point.name === bus.recommended_dropping_points?.[0]?.name
+        );
+        if (match) return match.dropping_point.name;
+      }
+      // Fallback to first allDroppingPoints
+      return bus.allDroppingPoints[0]?.dropping_point.name || null;
+    })()
+  );
   const [dropdownOpen, setDropdownOpen] = useState({ boarding: false, dropping: false });
 
   // Backend passengers
@@ -99,39 +108,91 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
   
   // Get styling and fare info
   const categoryStyle = getCategoryStyle(bus.category);
-  const categoryFare = calculateCategoryFare(allSeats);
+  const originalFare = calculateCategoryFare(allSeats);
+  
+  // Calculate final fare with discounts - FIXED VERSION
+  const calculateFinalFare = (): FinalFareCalculation => {
+    let baseFare = originalFare.baseFare;
+    let gst = originalFare.gst;
+    let discount = originalFare.discount;
+    
+    // Calculate the base total before applying additional discounts
+    let baseTotal = baseFare + gst + discount;
+    
+    // Apply discounts in order, ensuring we don't exceed the available amount
+    let actualGreenCoinsDiscount = 0;
+    let actualFreshCardDiscount = 0;
+    let remainingAmount = baseTotal;
+    
+    // First apply green coins discount
+    if (appliedGreenCoins > 0) {
+      actualGreenCoinsDiscount = Math.min(appliedGreenCoins, remainingAmount);
+      remainingAmount -= actualGreenCoinsDiscount;
+    }
+    
+    // Then apply fresh card discount to remaining amount
+    if (appliedFreshCard && freshCard) {
+      actualFreshCardDiscount = Math.min(freshCard.discountAmount, remainingAmount);
+      remainingAmount -= actualFreshCardDiscount;
+    }
+    
+    const finalTotal = remainingAmount;
+    
+    return {
+      baseFare,
+      gst,
+      discount,
+      greenCoinsDiscount: actualGreenCoinsDiscount,
+      freshCardDiscount: actualFreshCardDiscount,
+      total: finalTotal
+    };
+  };
 
-  // Load backend passengers when component mounts
+  // Load backend data when component mounts
   useEffect(() => {
     try {
-      let allPassengers: Passenger[] = [];
+      let busQueryResponse = null;
       
-      // Check if passengers are included in the bus data
-      if (bus && (bus as any).passengers) {
-        allPassengers = [...(bus as any).passengers];
+      // Check multiple sources for the bus query response
+      if (bus && (bus as any).busQueryResponse) {
+        busQueryResponse = (bus as any).busQueryResponse;
+      } else if (typeof window !== 'undefined' && (window as any).busQueryResponse) {
+        busQueryResponse = (window as any).busQueryResponse;
+      } else if (typeof window !== 'undefined' && (window as any).__BUS_QUERY_DATA__) {
+        busQueryResponse = (window as any).__BUS_QUERY_DATA__;
       } else {
-        // Try to get from window object or localStorage
-        let storedPassengers = null;
-        
-        if (typeof window !== 'undefined' && (window as any).busQueryResponse) {
-          storedPassengers = (window as any).busQueryResponse.passengers;
-        } else {
-          const storedData = localStorage.getItem('busQueryResponse');
-          if (storedData) {
-            try {
-              const parsed = JSON.parse(storedData);
-              if (parsed.passengers && Array.isArray(parsed.passengers)) {
-                storedPassengers = parsed.passengers;
-              }
-            } catch (e) {
-              console.error('Error parsing stored bus data:', e);
-            }
+        // Try localStorage
+        const storedData = localStorage.getItem('busQueryResponse');
+        if (storedData) {
+          try {
+            busQueryResponse = JSON.parse(storedData);
+          } catch (e) {
+            console.error('Error parsing stored bus data:', e);
           }
         }
-        
-        if (storedPassengers && Array.isArray(storedPassengers)) {
-          allPassengers = [...storedPassengers];
+      }
+      
+      console.log('Bus Query Response:', busQueryResponse); // Debug log
+      
+      if (busQueryResponse) {
+        // Set green coins data
+        if (busQueryResponse.green_coins) {
+          console.log('Setting green coins:', busQueryResponse.green_coins); // Debug log
+          setGreenCoins(busQueryResponse.green_coins);
         }
+        
+        // Set fresh card data
+        if (busQueryResponse.freshcard) {
+          console.log('Setting fresh card:', busQueryResponse.freshcard); // Debug log
+          setFreshCard(busQueryResponse.freshcard);
+        }
+        
+        // Set passengers data
+        if (busQueryResponse.passengers && Array.isArray(busQueryResponse.passengers)) {
+          setBackendPassengers(busQueryResponse.passengers);
+        }
+      } else {
+        console.warn('No bus query response data found');
       }
       
       // Also try to get recent passengers from localStorage
@@ -140,25 +201,24 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
         if (recentPassengersData) {
           const recentPassengers = JSON.parse(recentPassengersData);
           if (Array.isArray(recentPassengers)) {
-            // Merge with existing passengers, avoiding duplicates
-            recentPassengers.forEach(recentPass => {
-              if (!allPassengers.some(existingPass => 
-                existingPass.name.toLowerCase() === recentPass.name.toLowerCase() && 
-                existingPass.age === recentPass.age)) {
-                allPassengers.push(recentPass);
-              }
+            setBackendPassengers(prev => {
+              const allPassengers = [...prev];
+              recentPassengers.forEach(recentPass => {
+                if (!allPassengers.some(existingPass => 
+                  existingPass.name.toLowerCase() === recentPass.name.toLowerCase() && 
+                  existingPass.age === recentPass.age)) {
+                  allPassengers.push(recentPass);
+                }
+              });
+              return allPassengers;
             });
           }
         }
       } catch (e) {
         console.error('Error parsing recent passengers:', e);
       }
-      
-      if (allPassengers.length > 0) {
-        setBackendPassengers(allPassengers);
-      }
     } catch (e) {
-      console.error('Error loading passengers:', e);
+      console.error('Error loading backend data:', e);
     }
   }, [bus]);
 
@@ -193,6 +253,10 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
       setCurrentPassenger(initialPassengers[0]);
       setCurrentSeatIndex(0);
       setEditingIndex(null);
+      
+      // Reset discounts when modal opens
+      setAppliedGreenCoins(0);
+      setAppliedFreshCard(false);
     }
   }, [isModalOpen, selectedSeats, bus]);
 
@@ -210,9 +274,45 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
     setSelectedSeats(allSeats);
     setIsModalOpen(true);
     
-    // Store the backend passengers in localStorage for future use
-    if (window && (window as any).busQueryResponse && (window as any).busQueryResponse.passengers) {
+    // Store the backend data in localStorage for future use
+    if (window && (window as any).busQueryResponse) {
       localStorage.setItem('busQueryResponse', JSON.stringify((window as any).busQueryResponse));
+    }
+  };
+
+  // Handle green coins redemption - UPDATED (removed greenCoinsInput usage)
+  const handleRedeemGreenCoins = () => {
+    if (!greenCoins || greenCoins.available <= 0) {
+      toast.error('No green coins available to redeem');
+      return;
+    }
+    
+    // Calculate how much we can actually use
+    const currentFare = originalFare.total;
+    const maxUsable = Math.min(greenCoins.available, Math.floor(currentFare));
+    
+    if (maxUsable <= 0) {
+      toast.error('No green coins can be applied to this fare');
+      return;
+    }
+    
+    setAppliedGreenCoins(maxUsable);
+    toast.success(`₹${maxUsable} green coins will be applied!`);
+  };
+
+  // Handle fresh card application
+  const handleApplyFreshCard = () => {
+    if (!freshCard || !freshCard.available || freshCard.balance <= 0) {
+      toast.error('Fresh card not available or no balance remaining');
+      return;
+    }
+    
+    if (appliedFreshCard) {
+      setAppliedFreshCard(false);
+      toast.success('Fresh card discount removed');
+    } else {
+      setAppliedFreshCard(true);
+      toast.success(`Fresh card discount will be applied!`);
     }
   };
 
@@ -245,16 +345,6 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
     try {
       setIsProcessing(true);
       
-      // Calculate total fare for all selected seats
-      const totalFare = selectedSeats.reduce(
-        (total, seat) =>
-          total +
-          (seat.fare_details?.['Base Fare'] || 0) +
-          (seat.fare_details?.GST || 0) +
-          (seat.fare_details?.Discount || 0),
-        0
-      );
-      
       // Get the logged-in user's data
       let userMobile = '';
       let userId = '';
@@ -278,7 +368,7 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
       
       // Save passenger details for future bookings
       const passengersToSave = filledPassengers.map((p) => ({
-        id: Math.floor(Math.random() * 1000000) + 1, // Random ID for new passengers
+        id: Math.floor(Math.random() * 1000000) + 1,
         name: p.name,
         gender: p.gender,
         age: p.age || 0
@@ -287,7 +377,6 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
       // Merge and store unique passengers
       let allPassengers = [...backendPassengers];
       passengersToSave.forEach(newPass => {
-        // Only add if it's not already in the list (by name and age)
         if (!allPassengers.some(existingPass => 
           existingPass.name.toLowerCase() === newPass.name.toLowerCase() && 
           existingPass.age === newPass.age)) {
@@ -298,28 +387,29 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
       // Store in localStorage for future use
       localStorage.setItem('recentPassengers', JSON.stringify(allPassengers));
       
+      // Calculate final fare with accurate discount amounts
+      const finalFare = calculateFinalFare();
       
-      // Prepare payload according to backend expectations
-      const payload = {
-        mobile: userMobile,
-        email: '',
-        seat_map: passengerDetails.map((passenger, index) => ({
-          passenger_age: passenger.age,
-          seat_id: selectedSeats[index].seat_id,
-          passenger_name: passenger.name,
-          passenger_gender: passenger.gender,
-        })),
-        trip_id: bus.tripID,
-        boarding_point_id: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.boarding_point_id,
-        dropping_point_id: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.dropping_point_id,
-        boarding_point_time: bus.allBoardingPoints.find((bp) => bp.boarding_point.name === selectedBoarding)?.currentTime,
-        dropping_point_time: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.currentTime,
-        total_collect_amount: totalFare.toFixed(2),
-        main_category: 1,
-        freshcardId: 1,
-        freshcard: false,
-        return_url: `${window.location.origin}/payment/callback?session_id=${localStorage.getItem('sessionId')}`,
-      };
+      // Validate payment amount before proceeding
+      if (finalFare.total <= 0) {
+        toast.error('Invalid payment amount. Please check your discounts.');
+        return;
+      }
+      
+      console.log('Final fare calculation:', finalFare); // Debug log
+      
+      // Use the updated createPaymentPayload function with final fare calculation
+      const payload = createPaymentPayload(
+        bus,
+        selectedSeats,
+        passengerDetails,
+        selectedBoarding,
+        selectedDropping,
+        appliedGreenCoins,
+        appliedFreshCard,
+        freshCard,
+        finalFare // Pass the calculated fare breakdown
+      );
       
       const response = await authService.fetchWithRefresh('/api/tickets/block', {
         method: 'POST',
@@ -346,7 +436,7 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
       }
 
       toast.success('Redirecting to payment portal...');
-window.location.href = data.payment_url;
+      window.location.href = data.payment_url;
 
     } catch (error: any) {
       toast.error(error.message || 'An error occurred during payment.');
@@ -425,15 +515,11 @@ window.location.href = data.payment_url;
     }
   };
 
-  // Helper function to determine the text for the add passenger button
-
   // Check if all passengers are complete and valid
   const getFilledPassengersCount = () => 
     passengerDetails.filter(p => p.name && p.age !== undefined && p.gender).length;
   
   const areAllPassengersValid = getFilledPassengersCount() === selectedSeats.length;
-
-  // Helper function to check if there are available passenger suggestions
 
   // Render passenger suggestions from backend
   const renderPassengerSuggestions = () => {
@@ -524,6 +610,8 @@ window.location.href = data.payment_url;
       </div>
     );
   }
+
+  const finalFare = calculateFinalFare();
 
   return (
     <div className="space-y-4">
@@ -619,7 +707,7 @@ window.location.href = data.payment_url;
             <div className="text-sm">
               <div className='font-bold'>Total Fare:</div>
               <div>
-                <span className='font-bold'>₹{categoryFare.baseFare.toFixed(0)}{' '}</span>
+                <span className='font-bold'>₹{originalFare.baseFare.toFixed(0)}{' '}</span>
                 <span> + GST</span>
               </div>
             </div>
@@ -831,30 +919,40 @@ window.location.href = data.payment_url;
                   </div>
                 </div>
 
-
                 {/* Right Side: Fare Details */}
                 <div className="space-y-1 w-[40%] text-left ml-4">
                   <div className="flex justify-between text-xs">
                     <strong>Base Fare:</strong>
-                    <span>₹{categoryFare.baseFare.toFixed(2)}</span>
+                    <span>₹{finalFare.baseFare.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <strong>GST:</strong>
-                    <span>₹{categoryFare.gst.toFixed(2)}</span>
+                    <span>₹{finalFare.gst.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-green-500 text-xs">
+                  <div className="flex justify-between text-xs">
                     <strong>Discount:</strong>
-                    <span>₹{categoryFare.discount.toFixed(2)}</span>
+                    <span>₹{finalFare.discount.toFixed(2)}</span>
                   </div>
+                  {finalFare.greenCoinsDiscount > 0 && (
+                    <div className="flex justify-between text-green-600 text-xs">
+                      <strong>Green Coins:</strong>
+                      <span>-₹{finalFare.greenCoinsDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {finalFare.freshCardDiscount > 0 && (
+                    <div className="flex justify-between text-blue-600 text-xs">
+                      <strong>FreshCard:</strong>
+                      <span>-₹{finalFare.freshCardDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="border-t border-gray-300 my-1"></div>
                   <div className="flex justify-between text-xs font-semibold">
                     <strong>Total Fare:</strong>
-                    <span>₹{categoryFare.total.toFixed(2)}</span>
+                    <span>₹{finalFare.total.toFixed(2)}</span>
                   </div>
                   <div className="border-t border-gray-300 my-1"></div>
                 </div>
               </div>
-
 
               {/* Green Coins and Fresh Card Section */}
               <div className="flex items-stretch justify-between mt-2 space-x-3">
@@ -863,29 +961,73 @@ window.location.href = data.payment_url;
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center">
                       <p className="text-[10px] font-medium text-gray-700 dark:text-gray-300">
-                        Green Coins Balance: <span className="text-xs font-bold text-green-600 ml-1">100</span>
+                        Green Coins: <span className="text-xs font-bold text-green-600 ml-1">
+                          {greenCoins?.available || 0}
+                        </span>
                       </p>
                     </div>
-                    <button className="bg-green-500 hover:bg-green-600 text-white text-[10px] px-2 py-0.5 rounded-full transition-colors">
-                      Redeem
-                    </button>
+                    {appliedGreenCoins > 0 ? (
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => {
+                            setAppliedGreenCoins(0);
+                            toast.success('Green coins removed');
+                          }}
+                          className="text-[10px] px-2 py-0.5 rounded-full transition-colors bg-red-400 hover:bg-red-500 text-white font-bold"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1">
+                        <button 
+                          onClick={handleRedeemGreenCoins}
+                          disabled={!greenCoins || greenCoins.available <= 0}
+                          className={`text-[10px] px-2 py-0.5 rounded-full transition-colors font-bold ${
+                            greenCoins && greenCoins.available > 0
+                              ? 'bg-green-500 hover:bg-green-600 text-white'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[10px] text-gray-700 dark:text-gray-300 mt-1">
-                    Earn & Save on rides
+                  <div className="text-[10px] mt-1 font-bold">
+                    {appliedGreenCoins > 0 
+                      ? `Applied: ₹${appliedGreenCoins} (Used: ₹${finalFare.greenCoinsDiscount})`
+                      : 'Earn & Save on rides'
+                    }
                   </div>
                 </div>
 
                 {/* Fresh Card */}
                 <div className="flex flex-col justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-2 flex-1 min-h-[3rem]">
                   <div className="flex justify-between w-full">
-                    <div className=" text-white text-[10px] font-bold">
+                    <div className="text-gray-700 dark:text-gray-300 text-[10px] font-bold">
                       FRESH CARD
                     </div>
-                    <button className="ml-auto bg-yellow-400 hover:bg-yellow-500 text-gray-900 text-[10px] px-2 py-1 rounded transition-colors font-medium">
-                      Apply
+                    <button 
+                      onClick={handleApplyFreshCard}
+                      disabled={!freshCard || !freshCard.available || freshCard.balance <= 0}
+                      className={`ml-auto text-[10px] px-2 py-1 rounded transition-colors font-medium ${
+                        appliedFreshCard 
+                          ? 'bg-red-400 hover:bg-red-500 text-white'
+                          : freshCard && freshCard.available && freshCard.balance > 0
+                            ? 'bg-yellow-400 hover:bg-yellow-500 text-gray-900'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      {appliedFreshCard ? 'Remove' : 'Apply'}
                     </button>
                   </div>
-                  <p className="text-[10px] text-gray-700 dark:text-gray-300 mt-1 w-full text-left">Save ₹500 On Fresh Bus Rides</p>
+                  <p className="text-[10px] text-gray-700 dark:text-gray-300 mt-1 w-full text-left">
+                    {freshCard 
+                      ? `Balance: ${freshCard.balance} | Save ₹${freshCard.discountAmount}`
+                      : 'Save ₹500 On Fresh Bus Rides'
+                    }
+                  </p>
                 </div>
               </div>
               
@@ -1006,12 +1148,6 @@ window.location.href = data.payment_url;
                   
                   {/* Passenger suggestions */}
                   {renderPassengerSuggestions()}
-                  
-                  {/* Debug info - can be removed in production */}
-                  {backendPassengers.length > 0 ? (
-                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    </div>
-                  ) : null}
                 </div>
               )}
 

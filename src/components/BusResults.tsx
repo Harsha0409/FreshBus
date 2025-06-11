@@ -50,6 +50,26 @@ const BusResults: React.FC<BusResultsProps> = ({ searchQuery, onBook }) => {
             if (searchQuery.recommendations.length === 0) {
               setIsEmptyResponse(true);
             }
+            
+            // Store the complete response in window and localStorage
+            const completeResponse = {
+              recommendations: searchQuery.recommendations,
+              passengers: searchQuery.passengers || [],
+              green_coins: searchQuery.green_coins || null,
+              freshcard: searchQuery.freshcard || null
+            };
+            
+            // Store in window for immediate access
+            if (typeof window !== 'undefined') {
+              (window as any).busQueryResponse = completeResponse;
+              (window as any).__BUS_QUERY_DATA__ = completeResponse;
+            }
+            
+            // Store in localStorage for persistence
+            localStorage.setItem('busQueryResponse', JSON.stringify(completeResponse));
+            
+            console.log('Stored bus query response:', completeResponse); // Debug log
+            
             setBusData(normalizeData(searchQuery.recommendations));
             setPassengersData(searchQuery.passengers || []);
           }

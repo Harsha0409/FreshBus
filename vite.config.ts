@@ -22,7 +22,7 @@ export default defineConfig({
     open: false,
     proxy: {
       '/api': {
-        target: 'http://192.168.1.186:8000',
+        target: 'https://ai-api.freshbus.com',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''), // Remove the /api prefix
