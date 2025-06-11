@@ -33,7 +33,6 @@ export async function handleSendMessage(
   
   if (!user?.id || !user?.mobile) {
     toast.error("Please login to chat.");
-    // Trigger login modal
     window.dispatchEvent(new CustomEvent('login:required'));
     return;
   }
@@ -92,37 +91,45 @@ export async function handleSendMessage(
       return;
     }
 
-    const body = {
+    // Create the request payload as a proper object
+    const requestPayload = {
       query: content,
-      id: Number(user.id),
+      id: Number(user.id), // Ensure it's a number
       name: user.name || null,
       mobile: user.mobile,
       session_id: session_id || undefined
     };
 
-    const headers = new Headers({
-      'Content-Type': 'application/json',
-      'X-User-ID': user.id?.toString() || '',
-      'X-Session-ID': session_id || ''
-    });
+    console.log('[handleSendMessage] Request payload:', requestPayload);
 
     // Use fetchWithRefresh which handles token refresh automatically
     const response = await authService.fetchWithRefresh('/api/query', {
       method: 'POST',
-      headers,
-      body: JSON.stringify(body),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-ID': user.id?.toString() || '',
+        'X-Session-ID': session_id || ''
+      },
+      body: JSON.stringify(requestPayload), // This should create proper JSON
     });
 
+    console.log('[handleSendMessage] Response status:', response.status);
+
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({ message: 'Request failed' }));
+      console.error('[handleSendMessage] Error response:', errorData);
+      throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
     }
 
     const responseText = await response.text();
+    console.log('[handleSendMessage] Response text:', responseText);
+    
     let assistantContent: any = '';
 
     try {
       // Try to parse as JSON
       const parsed = JSON.parse(responseText);
+      console.log('[handleSendMessage] Parsed response:', parsed);
 
       if (parsed?.data?.upcoming_travels || parsed?.upcoming_travels) {
         // This is cancellation data - preserve the structure
@@ -144,7 +151,8 @@ export async function handleSendMessage(
       } else {
         assistantContent = responseText;
       }
-    } catch {
+    } catch (parseError) {
+      console.log('[handleSendMessage] Response is not JSON, using as text');
       assistantContent = responseText;
     }
 
@@ -170,6 +178,8 @@ export async function handleSendMessage(
       )
     );
   } catch (error: any) {
+    console.error('[handleSendMessage] Error:', error);
+    
     setChats((prevChats) =>
       prevChats.map((chat) =>
         chat.id === selectedChatId
