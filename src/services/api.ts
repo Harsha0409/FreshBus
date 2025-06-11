@@ -10,11 +10,19 @@ interface LoginResponse {
   };
 }
 
-// Add caching and throttling
+// Simplified global state - no more testAuth
 let profileCache: { data: any; timestamp: number } | null = null;
 let profileRequestInProgress = false;
+let refreshTokenRequestInProgress = false;
+
 const PROFILE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const PROFILE_REQUEST_THROTTLE = 2000; // 2 seconds between requests
+
+// Simplified request queues
+const requestQueues = {
+  profile: [] as Array<{ resolve: Function; reject: Function }>,
+  refreshToken: [] as Array<{ resolve: Function; reject: Function }>
+};
 
 export const authService = {
   // Send OTP
@@ -63,10 +71,12 @@ export const authService = {
 
       console.log('[verifyOTP] ✅ OTP verification successful');
 
-      // Clear any existing profile cache since we have new authentication
+      // Clear any existing cache since we have new authentication
       profileCache = null;
+      profileRequestInProgress = false;
+      refreshTokenRequestInProgress = false;
 
-      // Wait for HttpOnly cookies to be set by browser, then fetch profile ONCE
+      // Wait for HttpOnly cookies to be set, then fetch profile ONCE
       setTimeout(async () => {
         try {
           console.log('[verifyOTP] Fetching user profile after login...');
@@ -156,8 +166,10 @@ export const authService = {
     try {
       console.log('[logout] Logging out...');
       
-      // Clear cache before logout
+      // Clear cache and reset states
       profileCache = null;
+      profileRequestInProgress = false;
+      refreshTokenRequestInProgress = false;
       
       const response = await fetch(`/api/auth/logout`, {
         method: 'GET',
@@ -177,39 +189,32 @@ export const authService = {
     }
   },
 
-  // Enhanced Get Profile with better error handling
+  // Get Profile with request deduplication
   async getProfile(forceRefresh: boolean = false): Promise<any> {
+    // Return cached data if available and not forcing refresh
+    if (!forceRefresh && profileCache && Date.now() - profileCache.timestamp < PROFILE_CACHE_DURATION) {
+      console.log('[getProfile] ✅ Returning cached profile');
+      return profileCache.data;
+    }
+
+    // Throttle requests if not forcing refresh
+    if (!forceRefresh && profileCache && Date.now() - profileCache.timestamp < PROFILE_REQUEST_THROTTLE) {
+      console.log('[getProfile] ⏳ Throttling profile request, using cache');
+      return profileCache.data;
+    }
+
+    // If request is already in progress, queue this request
+    if (profileRequestInProgress) {
+      console.log('[getProfile] 📋 Request already in progress, queuing...');
+      return new Promise((resolve, reject) => {
+        requestQueues.profile.push({ resolve, reject });
+      });
+    }
+
     try {
-      // Check if request is already in progress
-      if (profileRequestInProgress && !forceRefresh) {
-        console.log('[getProfile] Request already in progress, waiting...');
-        // Wait for ongoing request to complete
-        while (profileRequestInProgress) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        // Return cached result if available
-        if (profileCache && Date.now() - profileCache.timestamp < PROFILE_CACHE_DURATION) {
-          console.log('[getProfile] Returning cached profile after wait');
-          return profileCache.data;
-        }
-      }
-
-      // Check cache first (unless forced refresh)
-      if (!forceRefresh && profileCache && Date.now() - profileCache.timestamp < PROFILE_CACHE_DURATION) {
-        console.log('[getProfile] ✅ Returning cached profile');
-        return profileCache.data;
-      }
-
-      // Throttle requests
-      if (!forceRefresh && profileCache && Date.now() - profileCache.timestamp < PROFILE_REQUEST_THROTTLE) {
-        console.log('[getProfile] ⏳ Throttling profile request, using cache');
-        return profileCache.data;
-      }
-
       console.log('[getProfile] 🔄 Fetching fresh profile from server...');
       profileRequestInProgress = true;
       
-      // 🔥 USE fetchWithRefresh instead of direct fetch for automatic token refresh
       const response = await this.fetchWithRefresh('/api/auth/profile', {
         method: 'GET',
       });
@@ -235,11 +240,21 @@ export const authService = {
         localStorage.setItem('auth_validated', 'true');
       }
 
+      // Resolve all queued requests
+      requestQueues.profile.forEach(({ resolve }) => resolve(profile));
+      requestQueues.profile = [];
+
       profileRequestInProgress = false;
       return profile;
     } catch (error: any) {
-      profileRequestInProgress = false;
       console.error('[getProfile] Error:', error.message);
+      
+      // Reject all queued requests
+      requestQueues.profile.forEach(({ reject }) => reject(error));
+      requestQueues.profile = [];
+      
+      profileRequestInProgress = false;
+      
       if (error.message === 'Session expired' || error.message.includes('Session expired')) {
         this.clearAuth();
         profileCache = null;
@@ -254,7 +269,14 @@ export const authService = {
     localStorage.removeItem('user');
     localStorage.removeItem('sessionId');
     localStorage.removeItem('auth_validated');
-    profileCache = null; // Clear cache
+    profileCache = null;
+    profileRequestInProgress = false;
+    refreshTokenRequestInProgress = false;
+    
+    // Clear all queues
+    Object.keys(requestQueues).forEach(key => {
+      requestQueues[key as keyof typeof requestQueues] = [];
+    });
   },
 
   // Get User from LocalStorage
@@ -269,7 +291,7 @@ export const authService = {
     }
   },
 
-  // Check if user is authenticated
+  // Check if user is authenticated (only checks localStorage)
   isAuthenticated(): boolean {
     const user = this.getUser();
     const authValidated = localStorage.getItem('auth_validated') === 'true';
@@ -279,45 +301,19 @@ export const authService = {
     return result;
   },
 
-  // Test authentication - NOW USES fetchWithRefresh for automatic token refresh
-  async testAuthentication(): Promise<boolean> {
-    try {
-      console.log('[testAuthentication] Testing with server...');
-      
-      // Use cached profile if available and recent
-      if (profileCache && Date.now() - profileCache.timestamp < PROFILE_REQUEST_THROTTLE) {
-        console.log('[testAuthentication] ✅ Using cached auth result');
-        return true;
-      }
-      
-      // 🔥 USE fetchWithRefresh instead of direct fetch
-      const response = await this.fetchWithRefresh('/api/auth/profile', {
-        method: 'GET',
-      });
-      
-      const isValid = response.ok;
-      console.log('[testAuthentication]', isValid ? '✅ Server confirmed auth' : `❌ Server rejected auth (${response.status})`);
-      
-      // Update cache timestamp if successful
-      if (isValid && profileCache) {
-        profileCache.timestamp = Date.now();
-      }
-      
-      return isValid;
-    } catch (error: any) {
-      console.error('[testAuthentication] Error:', error);
-      // If error is about session expiry, return false
-      if (error.message === 'Session expired' || error.message.includes('Session expired')) {
-        return false;
-      }
-      return false;
-    }
-  },
-
-  // Refresh token - using GET method
+  // Refresh token with request deduplication
   async refreshToken(): Promise<boolean> {
+    // If refresh is already in progress, queue this request
+    if (refreshTokenRequestInProgress) {
+      console.log('[refreshToken] 📋 Refresh already in progress, queuing...');
+      return new Promise((resolve, reject) => {
+        requestQueues.refreshToken.push({ resolve, reject });
+      });
+    }
+
     try {
       console.log('[refreshToken] 🔄 Attempting token refresh...');
+      refreshTokenRequestInProgress = true;
       
       const refreshResponse = await fetch('/api/auth/refresh-token', {
         method: 'GET',
@@ -327,26 +323,52 @@ export const authService = {
         },
       });
 
-      const success = refreshResponse.ok;
-      console.log('[refreshToken]', success ? '✅ Token refreshed successfully' : `❌ Refresh failed (${refreshResponse.status})`);
+      console.log('[refreshToken] Refresh response status:', refreshResponse.status);
 
-      if (success) {
+      if (refreshResponse.ok) {
+        console.log('[refreshToken] ✅ Token refreshed successfully');
         // Clear cache so next request fetches fresh data with new token
         profileCache = null;
-        console.log('[refreshToken] ✅ Cleared profile cache for fresh data');
+        
+        // Resolve all queued requests
+        requestQueues.refreshToken.forEach(({ resolve }) => resolve(true));
+        requestQueues.refreshToken = [];
+        
+        refreshTokenRequestInProgress = false;
+        return true;
       } else {
-        const errorText = await refreshResponse.text().catch(() => 'Unknown error');
-        console.log('[refreshToken] Refresh error details:', errorText);
+        let success = false;
+        // Handle specific error codes
+        if (refreshResponse.status === 403) {
+          console.log('[refreshToken] ❌ 403 Forbidden - Refresh token expired/invalid');
+          this.clearAuth();
+        } else if (refreshResponse.status === 401) {
+          console.log('[refreshToken] ❌ 401 Unauthorized - Refresh token invalid');
+          this.clearAuth();
+        } else {
+          console.log('[refreshToken] ❌ Refresh failed with status:', refreshResponse.status);
+        }
+        
+        // Resolve all queued requests with false
+        requestQueues.refreshToken.forEach(({ resolve }) => resolve(success));
+        requestQueues.refreshToken = [];
+        
+        refreshTokenRequestInProgress = false;
+        return success;
       }
-
-      return success;
     } catch (error) {
       console.error('[refreshToken] Error:', error);
+      
+      // Reject all queued requests
+      requestQueues.refreshToken.forEach(({ reject }) => reject(error));
+      requestQueues.refreshToken = [];
+      
+      refreshTokenRequestInProgress = false;
       return false;
     }
   },
 
-  // Enhanced fetchWithRefresh with better token refresh flow
+  // fetchWithRefresh remains the same
   async fetchWithRefresh(url: string, opts: RequestInit = {}): Promise<Response> {
     console.log(`[fetchWithRefresh] 🚀 ${opts.method || 'GET'} ${url}`);
     
@@ -367,14 +389,6 @@ export const authService = {
     if (response.status === 401) {
       console.log('[fetchWithRefresh] 🔑 401 received - attempting token refresh...');
       
-      // Get error details for debugging
-      try {
-        const errorData = await response.clone().json();
-        console.log('[fetchWithRefresh] 401 error details:', errorData);
-      } catch (e) {
-        console.log('[fetchWithRefresh] Could not parse 401 error response');
-      }
-      
       const refreshed = await this.refreshToken();
       
       if (refreshed) {
@@ -387,21 +401,19 @@ export const authService = {
           this.clearAuth();
           window.dispatchEvent(new CustomEvent('auth:required'));
           throw new Error('Session expired - please login again');
-        } else {
-          console.log('[fetchWithRefresh] ✅ Request successful after token refresh');
         }
       } else {
         console.log('[fetchWithRefresh] ❌ Refresh failed - clearing auth');
         this.clearAuth();
         window.dispatchEvent(new CustomEvent('auth:required'));
-        throw new Error('Authentication failed - please login again');
+        throw new Error('Session expired - please login again');
       }
     }
 
     return response;
   },
 
-  // Enhanced initialization with proper token refresh handling
+  // Simplified initialization - uses getProfile() directly
   async initializeAuth(): Promise<boolean> {
     console.log('[initializeAuth] 🔍 Checking authentication...');
     
@@ -414,30 +426,22 @@ export const authService = {
       authValidated: authValidated
     });
 
-    // If we have user data and validation flag, test with server using fetchWithRefresh
+    // If we have user data and validation flag, test with server using getProfile
     if (user && user.id && authValidated) {
       // Only test with server if cache is old or missing
       if (!profileCache || Date.now() - profileCache.timestamp > PROFILE_CACHE_DURATION) {
-        console.log('[initializeAuth] Testing authentication with server (using fetchWithRefresh)...');
+        console.log('[initializeAuth] Testing authentication with server...');
         
         try {
-          const isValid = await this.testAuthentication(); // This now uses fetchWithRefresh internally
-          
-          if (isValid) {
-            console.log('[initializeAuth] ✅ Authentication confirmed');
-            return true;
-          } else {
-            console.log('[initializeAuth] ❌ Server rejected auth, clearing data');
-            this.clearAuth();
-            return false;
-          }
+          await this.getProfile(); // This will handle token refresh automatically
+          console.log('[initializeAuth] ✅ Authentication confirmed');
+          return true;
         } catch (error: any) {
           console.error('[initializeAuth] Auth test failed:', error);
           if (error.message.includes('Session expired')) {
             console.log('[initializeAuth] Session expired during test');
             return false;
           }
-          // For other errors, assume not authenticated
           this.clearAuth();
           return false;
         }
@@ -449,29 +453,18 @@ export const authService = {
 
     // Only test for existing session if no local data
     if (!user && !authValidated) {
-      console.log('[initializeAuth] No local data, testing for existing session with fetchWithRefresh...');
+      console.log('[initializeAuth] No local data, testing for existing session...');
       
       try {
-        const isValid = await this.testAuthentication(); // This will automatically try token refresh
-        
-        if (isValid) {
-          console.log('[initializeAuth] Found valid session, fetching profile...');
-          try {
-            await this.getProfile(true); // This also uses fetchWithRefresh
-            const updatedUser = this.getUser();
-            if (updatedUser && updatedUser.id) {
-              console.log('[initializeAuth] ✅ Session restored');
-              return true;
-            }
-          } catch (error) {
-            console.error('[initializeAuth] Failed to restore session:', error);
-          }
+        await this.getProfile(true); // Force fetch to test session
+        const updatedUser = this.getUser();
+        if (updatedUser && updatedUser.id) {
+          console.log('[initializeAuth] ✅ Session restored');
+          return true;
         }
       } catch (error: any) {
         console.error('[initializeAuth] Session test failed:', error);
-        if (error.message.includes('Session expired')) {
-          console.log('[initializeAuth] No valid session found');
-        }
+        // This is expected if no valid session exists
       }
     }
 
