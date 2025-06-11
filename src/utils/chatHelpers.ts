@@ -246,11 +246,11 @@ export async function loadConversation(
 
     console.log(`[loadConversation] Loading conversation: ${conversationId}`);
 
-    // Skip authentication test for chat history loading
-    const historyResponse = await fetch(
+    // Use fetchWithRefresh to ensure cookies are sent and tokens are refreshed if needed
+    const historyResponse = await authService.fetchWithRefresh(
       `/api/history?user_id=${user.id}&session_id=${conversationId}`,
       {
-        credentials: 'include',
+        method: 'GET',
         headers: {
           'X-User-ID': user.id.toString(),
           'X-Session-ID': conversationId

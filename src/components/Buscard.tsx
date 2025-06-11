@@ -255,16 +255,25 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
         0
       );
       
-      // Get the logged-in user's mobile number
+      // Get the logged-in user's data
       let userMobile = '';
+      let userId = '';
       const userStr = localStorage.getItem('user');
       if (userStr) {
         try {
           const userData = JSON.parse(userStr);
           userMobile = userData.mobile || '';
+          userId = userData.id || '';
         } catch (e) {
           console.error('Error parsing user data:', e);
         }
+      }
+
+      // Check if user is authenticated
+      if (!userId || !userMobile) {
+        toast.error('Please login to continue with booking.');
+        window.dispatchEvent(new CustomEvent('login:required'));
+        return;
       }
       
       // Save passenger details for future bookings
@@ -316,6 +325,8 @@ const [selectedDropping, setSelectedDropping] = useState<string | null>(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-ID': userId,
+          'X-Session-ID': localStorage.getItem('sessionId') || '',
         },
         body: JSON.stringify(payload),
       });

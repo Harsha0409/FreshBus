@@ -6,6 +6,7 @@ import { useTheme } from "../context/ThemeContext"
 import { UpcomingTravelsResponse, UpcomingTravel} from "../types/cancellation"
 import toast from 'react-hot-toast'
 import { addAIMessageToChat } from '../utils/chatHelpers';
+import { authService } from '../services/api';
 import ReactDOM from 'react-dom';
 
 interface CancellationCardProps {
@@ -220,16 +221,14 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
         user = {};
       }
 
-      const headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`, // Get fresh token
-          'X-User-ID': user.id?.toString() || '',
-          'X-Session-ID': sessionId || ''
-      };
-
-      const response = await fetch(`/api/tickets/${selectedTravel.travel_details.id}/cancel`, {
+      // Use authService.fetchWithRefresh for cookie-based authentication with automatic token refresh
+      const response = await authService.fetchWithRefresh(`/api/tickets/${selectedTravel.travel_details.id}/cancel`, {
           method: 'POST',
-          headers: headers,
+          headers: {
+              'Content-Type': 'application/json',
+              'X-User-ID': user.id?.toString() || '',
+              'X-Session-ID': sessionId || ''
+          },
           body: JSON.stringify(payload)
       });
 
@@ -313,7 +312,7 @@ Thank you for using our service.`;
           return (
             <div
               key={travel.travel_details.id}
-              className="rounded-lg border p-2 border-0 text-white cursor-pointer hover:shadow-lg transition-shadow duration-200 shadow-sm"
+              className="rounded-lg border p-2 text-white cursor-pointer hover:shadow-lg transition-shadow duration-200 shadow-sm"
               style={{ background: 'linear-gradient(to bottom right, #0078d4, #005a9e)' }}
               onClick={() => handleTravelSelect(travel)}
             >
