@@ -274,9 +274,9 @@ export function createPaymentPayload(
     dropping_point_time: bus.allDroppingPoints.find((dp) => dp.dropping_point.name === selectedDropping)?.currentTime,
     total_collect_amount: finalAmount.toFixed(2),
     main_category: 1,
-    freshcardId: appliedFreshCard && freshCard ? freshCard.id : null,
+    freshcardId: appliedFreshCard && freshCard ? freshCard.id : 0,
     freshcard: appliedFreshCard,
-    green_coins_used: actualGreenCoinsUsed, // Send the actual amount used, not the applied amount
+    green_coins: actualGreenCoinsUsed, // Send the actual amount used, not the applied amount
     return_url: `${window.location.origin}/payment/callback?session_id=${localStorage.getItem('sessionId')}`,
   };
 

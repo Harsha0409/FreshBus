@@ -119,25 +119,32 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
     // Calculate the base total before applying additional discounts
     let baseTotal = baseFare + gst + discount;
     
-    // Apply discounts in order, ensuring we don't exceed the available amount
     let actualGreenCoinsDiscount = 0;
     let actualFreshCardDiscount = 0;
-    let remainingAmount = baseTotal;
-    
-    // First apply green coins discount
-    if (appliedGreenCoins > 0) {
-      actualGreenCoinsDiscount = Math.min(appliedGreenCoins, remainingAmount);
-      remainingAmount -= actualGreenCoinsDiscount;
+    let finalTotal = baseTotal; // Start with base total
+
+    // Scenario 1: Fresh Card is applied (high priority)
+    if (appliedFreshCard && freshCard && freshCard.discountAmount > 0) {
+      actualFreshCardDiscount = Math.min(freshCard.discountAmount, baseTotal);
+      finalTotal -= actualFreshCardDiscount;
+      
+      // Now apply Green Coins to the remaining amount, rounded up
+      if (appliedGreenCoins > 0) {
+        actualGreenCoinsDiscount = Math.min(appliedGreenCoins, Math.ceil(finalTotal));
+        finalTotal -= actualGreenCoinsDiscount;
+      }
+    } 
+    // Scenario 2: Only Green Coins are applied (or Fresh Card not available/applied)
+    else if (appliedGreenCoins > 0) {
+      // Green coins applied should cover the base total amount, rounded up
+      actualGreenCoinsDiscount = Math.min(appliedGreenCoins, Math.ceil(baseTotal));
+      finalTotal -= actualGreenCoinsDiscount;
     }
-    
-    // Then apply fresh card discount to remaining amount
-    if (appliedFreshCard && freshCard) {
-      actualFreshCardDiscount = Math.min(freshCard.discountAmount, remainingAmount);
-      remainingAmount -= actualFreshCardDiscount;
-    }
-    
-    const finalTotal = remainingAmount;
-    
+    // If neither is applied, finalTotal remains baseTotal
+
+    // Ensure finalTotal doesn't go below zero
+    finalTotal = Math.max(0, finalTotal);
+
     return {
       baseFare,
       gst,
@@ -254,11 +261,26 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       setCurrentSeatIndex(0);
       setEditingIndex(null);
       
-      // Reset discounts when modal opens
+      // Reset discounts when modal opens (before re-applying them)
       setAppliedGreenCoins(0);
       setAppliedFreshCard(false);
+      
+      // Automatically apply Green Coins if available
+      if (greenCoins && greenCoins.available > 0) {
+        // Calculate original fare without any discounts for initial green coin application
+        const initialFare = calculateCategoryFare(selectedSeats).total;
+        const maxUsable = Math.min(greenCoins.available, Math.ceil(initialFare));
+        if (maxUsable > 0) {
+          setAppliedGreenCoins(maxUsable);
+        }
+      }
+
+      // Automatically apply Fresh Card if available
+      if (freshCard && freshCard.available && freshCard.balance > 0) {
+        setAppliedFreshCard(true);
+      }
     }
-  }, [isModalOpen, selectedSeats, bus]);
+  }, [isModalOpen, selectedSeats, bus, greenCoins, freshCard]);
 
   // Animation effect for modal
   useEffect(() => {
@@ -287,9 +309,9 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       return;
     }
     
-    // Calculate how much we can actually use
+    // Calculate how much we can actually use, rounding up to cover the full amount
     const currentFare = originalFare.total;
-    const maxUsable = Math.min(greenCoins.available, Math.floor(currentFare));
+    const maxUsable = Math.min(greenCoins.available, Math.ceil(currentFare));
     
     if (maxUsable <= 0) {
       toast.error('No green coins can be applied to this fare');
@@ -391,8 +413,9 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       const finalFare = calculateFinalFare();
       
       // Validate payment amount before proceeding
-      if (finalFare.total <= 0) {
-        toast.error('Invalid payment amount. Please check your discounts.');
+      // Allow payment if final total is exactly 0 after discounts
+      if (finalFare.total < 0) {
+        toast.error('Invalid payment amount. Final fare cannot be negative.');
         return;
       }
       

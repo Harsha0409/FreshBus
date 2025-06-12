@@ -122,12 +122,20 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
 
   // Payment status check effect
   useEffect(() => {
-    // Check for payment status when chat loads or changes
     const paymentStatusStr = localStorage.getItem('paymentStatus');
+    console.log('[Layout useEffect paymentStatus] paymentStatusStr:', paymentStatusStr ? 'found' : 'not found');
+
     if (paymentStatusStr) {
       try {
         const paymentStatus = JSON.parse(paymentStatusStr);
+        console.log('[Layout useEffect paymentStatus] Parsed paymentStatus:', paymentStatus);
+        console.log('[Layout useEffect paymentStatus] paymentStatus.sessionId:', paymentStatus.sessionId);
+        console.log('[Layout useEffect paymentStatus] selectedChatId:', selectedChatId);
+        console.log('[Layout useEffect paymentStatus] urlSessionId:', urlSessionId);
+        console.log('[Layout useEffect paymentStatus] paymentStatus.summary exists:', !!paymentStatus.summary);
+
         if (paymentStatus.sessionId === selectedChatId && paymentStatus.summary) {
+          console.log('[Layout useEffect paymentStatus] Condition met: Adding payment confirmation message.');
           // Add a slight delay to ensure the UI is ready
           setTimeout(async () => {
             const messageContent = paymentStatus.ticketData
@@ -164,13 +172,15 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
             // Remove the payment status from localStorage after using it
             localStorage.removeItem('paymentStatus');
           }, 500);
+        } else {
+          console.log('[Layout useEffect paymentStatus] Condition NOT met. Session ID mismatch or summary missing.');
         }
       } catch (error) {
-        console.error('Error parsing payment status:', error);
+        console.error('Error parsing payment status from localStorage:', error);
         localStorage.removeItem('paymentStatus');
       }
     }
-  }, [selectedChatId, setChats]);
+  }, [selectedChatId, setChats, urlSessionId]);
 
   // Main session handling effect with proper guards
   useEffect(() => {
