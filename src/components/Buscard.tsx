@@ -957,13 +957,13 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                     <span>₹{finalFare.discount.toFixed(2)}</span>
                   </div>
                   {finalFare.greenCoinsDiscount > 0 && (
-                    <div className="flex justify-between text-green-600 text-xs">
+                    <div className="flex justify-between  text-xs">
                       <strong>Green Coins:</strong>
                       <span>-₹{finalFare.greenCoinsDiscount.toFixed(2)}</span>
                     </div>
                   )}
                   {finalFare.freshCardDiscount > 0 && (
-                    <div className="flex justify-between text-blue-600 text-xs">
+                    <div className="flex justify-between text-xs">
                       <strong>FreshCard:</strong>
                       <span>-₹{finalFare.freshCardDiscount.toFixed(2)}</span>
                     </div>
@@ -1018,10 +1018,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                     )}
                   </div>
                   <div className="text-[10px] mt-1 font-bold">
-                    {appliedGreenCoins > 0 
-                      ? `Applied: ₹${appliedGreenCoins} (Used: ₹${finalFare.greenCoinsDiscount})`
-                      : 'Earn & Save on rides'
-                    }
+                     'Earn & Save on rides'
                   </div>
                 </div>
 
