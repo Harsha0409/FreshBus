@@ -187,17 +187,26 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
 
   const handleConfirmPayment = async () => {
     if (selectedSeatsForCancellation.size === 0) {
-      toast.error('Please select at least one seat to cancel.');
+      setShowPolicyModal(false);
+      setTimeout(() => {
+        toast.error('Please select at least one seat to cancel.');
+      }, 100);
       return;
     }
 
     if (!selectedRefundMethod) {
-      toast.error('Please select a refund method.');
+      setShowPolicyModal(false);
+      setTimeout(() => {
+        toast.error('Please select a refund method.');
+      }, 100);
       return;
     }
 
     if (!selectedTravel) {
-      toast.error('No travel selected.');
+      setShowPolicyModal(false);
+      setTimeout(() => {
+        toast.error('No travel selected.');
+      }, 100);
       return;
     }
 
@@ -232,16 +241,33 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
           body: JSON.stringify(payload)
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to cancel ticket');
+        setShowPolicyModal(false);
+        setTimeout(() => {
+          const errorMessage = responseData.message?.toLowerCase() || '';
+          if (errorMessage.includes('already cancelled') || 
+              errorMessage.includes('mockresponse') || 
+              (responseData.statusCode === 400 && errorMessage.includes('selected seat has already been cancelled'))) {
+            toast.error('Your ticket has already been cancelled.');
+          } else if (errorMessage.includes('session expired')) {
+            toast.error('Your session has expired. Please login again.');
+            window.dispatchEvent(new CustomEvent('login:required'));
+          } else if (errorMessage.includes('invalid ticket')) {
+            toast.error('Invalid ticket. Please try again.');
+          } else {
+            toast.error('Unable to cancel ticket. Please try again later.');
+          }
+        }, 100);
+        return;
       }
 
-      const responseData = await response.json(); // Use await to ensure the response is fully read
-
       // Display success message
-      toast.success('Ticket cancelled successfully');
       setShowPolicyModal(false);
+      setTimeout(() => {
+        toast.success('Ticket cancelled successfully');
+      }, 100);
       
       // Get the refund amount from popup calculation instead of backend for green coins
       let refundAmountText = '';
@@ -278,7 +304,10 @@ Thank you for using our service.`;
 
     } catch (error) {
       console.error('Error cancelling ticket:', error);
-      toast.error((error as Error).message || 'An error occurred while cancelling the ticket');
+      setShowPolicyModal(false);
+      setTimeout(() => {
+        toast.error((error as Error).message || 'An error occurred while cancelling the ticket');
+      }, 100);
     } finally {
       setIsProcessing(false);
     }
@@ -324,7 +353,7 @@ Thank you for using our service.`;
                     <p className="text-sm font-bold truncate">{travel.travel_details.source.point}</p>
                   </div>
                   <div className="text-xs w-full">
-                    <div className="font-bold">Cancellation Seats:</div>
+                    <div className="font-bold">Seats:</div>
                     <div className="mt-2 flex flex-wrap gap-1">
                       {travel.policy.cancelSeatResponseDto.map((seat) => {
                         // Check if the seat is active

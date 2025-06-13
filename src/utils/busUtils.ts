@@ -28,7 +28,7 @@ export function convertToIST(utcTime: string): { date: string; time: string } {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
-  });
+  }).replace(/am|pm/gi, match => match.toUpperCase());
   return { date: formattedDate, time: formattedTime };
 }
 

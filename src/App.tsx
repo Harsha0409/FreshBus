@@ -79,7 +79,12 @@ function AppContent({
           <Route path="/payment/callback" element={<PaymentCallback />} />
         </Routes>
         <LoginModal />
-        <ToastContainer position="top-right" autoClose={2000} />
+        <ToastContainer 
+          position="top-right" 
+          autoClose={2000} 
+          style={{ zIndex: 999999 }}
+          toastStyle={{ zIndex: 999999 }}
+        />
       </LoginModalProvider>
     </ThemeProvider>
   );

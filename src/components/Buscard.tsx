@@ -731,7 +731,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
               <div className='font-bold'>Total Fare:</div>
               <div>
                 <span className='font-bold'>₹{originalFare.baseFare.toFixed(0)}{' '}</span>
-                <span> + GST</span>
+                <span className='text-xs'> + GST</span>
               </div>
             </div>
           </div>
