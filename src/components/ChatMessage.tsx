@@ -103,9 +103,71 @@ export function ChatMessage({ message, onBook, selectedChatId, setChats }: ChatM
     parsedContent !== null &&
     (parsedContent.success === true || parsedContent.data?.upcoming_travels)
   ) {
-    const cancellationData = parsedContent.success === true ? 
-      parsedContent : 
-      { success: true, data: { upcoming_travels: parsedContent } };
+    // Get the upcoming travels
+    const upcomingTravels = parsedContent.success === true ? 
+      parsedContent.data.upcoming_travels : 
+      parsedContent;
+
+    // Check if this is a "Where is my bus?" query
+    const isWhereIsMyBusQuery = typeof message.content === 'string' && 
+      message.content.toLowerCase().includes('where is my bus');
+
+    let cancellationData;
+    
+    if (isWhereIsMyBusQuery) {
+      // Helper function to convert month name to number
+      function getMonthNumber(monthName: string): number {
+        const months: { [key: string]: number } = {
+          'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
+          'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
+        };
+        return months[monthName];
+      }
+
+      // Sort journeys by date and time to get the latest one
+      const sortedJourneys = [...upcomingTravels].sort((a, b) => {
+        // Parse the date and time strings
+        const parseDateTime = (dateTimeStr: string) => {
+          const [datePart, timePart] = dateTimeStr.split(' at ');
+          const [month, day, year] = datePart.split(' ')[0].split(',')[0].split(' ');
+          const [time, period] = timePart.split(' ');
+          let [hours, minutes] = time.split(':').map(Number);
+          
+          // Convert to 24-hour format
+          if (period === 'PM' && hours !== 12) hours += 12;
+          if (period === 'AM' && hours === 12) hours = 0;
+          
+          return new Date(parseInt(year), getMonthNumber(month), parseInt(day), hours, minutes);
+        };
+
+        const dateA = parseDateTime(a.date);
+        const dateB = parseDateTime(b.date);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      // Take only the latest journey
+      const latestJourney = sortedJourneys[0];
+      cancellationData = {
+        success: true,
+        data: {
+          upcoming_travels: [latestJourney],
+          count: 1,
+          fetch_timestamp: new Date().toISOString()
+        }
+      };
+    } else {
+      // For cancellation view, show all journeys
+      cancellationData = parsedContent.success === true ? 
+        parsedContent : 
+        { 
+          success: true, 
+          data: { 
+            upcoming_travels: upcomingTravels,
+            count: upcomingTravels.length,
+            fetch_timestamp: new Date().toISOString()
+          } 
+        };
+    }
 
     return (
       <div className="flex justify-start items-start py-1 mb-4 gap-1">
