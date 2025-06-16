@@ -447,35 +447,35 @@ const Layout: React.FC<LayoutProps> = ({ chats, setChats }) => {
                 </div>
                 <div className="flex flex-col items-center justify-center w-full mt-1 ">
                   <button
-                    onClick={() => handleSendMessageHelper("Book me a ticket from Hyderabad to Vijayawada")}
-                    className={`px-7 py-2 rounded-lg font-medium transition-all duration-200 border-2 border-white shadow-lg hover:shadow-xl hover:translate-y-[-2px] hover:scale-[1.02] ${
+                    onClick={() => handleSendMessageHelper("Book a ticket from Hyderabad to Vijayawada for  tomorrow")}
+                    className={`px-3 py-2 rounded-lg font-medium transition-all duration-200 border-2 border-white shadow-lg hover:shadow-xl hover:translate-y-[-2px] hover:scale-[1.02] ${
                       theme === "light" 
                         ? "bg-[rgba(229,229,229,0.8)] text-black" 
                         : "bg-[rgba(34,34,34,0.8)] text-white"
                     }`}                    
                   >
-                    Book me a ticket from Hyderabad to Vijayawada today
+                    Book a ticket from Hyderabad to Vijayawada for  tomorrow
                   </button>
-                  <div className="flex justify-center gap-4 w-[100%] max-w-md mt-2">
+                  <div className="flex justify-center gap-2 w-[100%] max-w-md mt-2">
                     <button
-                      onClick={() => handleSendMessageHelper("Where is my bus?")}
-                      className={`px-8 py-2 rounded-lg font-medium transition-all duration-200 border-2 border-white shadow-lg hover:shadow-xl hover:translate-y-[-2px] hover:scale-[1.02] ${
+                      onClick={() => handleSendMessageHelper("Where is my Bus?")}
+                      className={`px-10 py-2 rounded-lg font-medium transition-all duration-200 border-2 border-white shadow-lg hover:shadow-xl hover:translate-y-[-2px] hover:scale-[1.02] ${
                         theme === "light" 
                           ? "bg-[rgba(229,229,229,0.8)] text-black" 
                           : "bg-[rgba(34,34,34,0.8)] text-white"
                       }`}  
                     >
-                      Where is my bus?
+                      Where is my Bus?
                     </button>
                     <button
-                      onClick={() => handleSendMessageHelper("My Green coin balance?")}
-                      className={`px-8 py-2 rounded-lg font-medium transition-all duration-200 border-2 border-white shadow-lg hover:shadow-xl hover:translate-y-[-2px] hover:scale-[1.02] ${
+                      onClick={() => handleSendMessageHelper("Green coins balance")}
+                      className={`px-10 py-2 rounded-lg font-medium transition-all duration-200 border-2 border-white shadow-lg hover:shadow-xl hover:translate-y-[-2px] hover:scale-[1.02] ${
                         theme === "light" 
                           ? "bg-[rgba(229,229,229,0.8)] text-black" 
                           : "bg-[rgba(34,34,34,0.8)] text-white"
                       }`}  
                     >
-                      My Green coin balance?
+                      Green coins balance
                     </button>
                   </div>
                 </div>
