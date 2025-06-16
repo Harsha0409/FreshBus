@@ -450,6 +450,16 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       }
 
       const data = await response.json();
+      
+      // Handle the case where payment is confirmed using green coins
+      if (data.success && !data.payment_url && !data.api_order_id) {
+        toast.success('Ticket booked successfully using green coins!');
+        // Close the modal after successful booking
+        handleModalClose();
+        // You can add additional logic here like redirecting to ticket details page
+        return;
+      }
+
       if (data.api_order_id) {
         localStorage.setItem('current_order_id', data.api_order_id);
       }

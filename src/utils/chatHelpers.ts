@@ -22,6 +22,19 @@ export function createNewSession(
   return newChat.id;
 }
 
+// Function to convert URLs to markdown links
+function convertUrlsToMarkdownLinks(text: string): string {
+  // Regular expression to match URLs
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  
+  // Replace URLs with markdown links
+  return text.replace(urlRegex, (url) => {
+    // Remove any trailing punctuation from the URL
+    const cleanUrl = url.replace(/[.,;:!?]$/, '');
+    return `[${cleanUrl}](${cleanUrl})`;
+  });
+}
+
 export async function handleSendMessage(
   content: string,
   selectedChatId: string,
@@ -147,13 +160,15 @@ export async function handleSendMessage(
         'reply' in parsed &&
         typeof parsed.reply === 'string'
       ) {
-        assistantContent = parsed.reply;
+        // Convert URLs to markdown links in the reply
+        assistantContent = convertUrlsToMarkdownLinks(parsed.reply);
       } else {
         assistantContent = responseText;
       }
     } catch (parseError) {
       console.log('[handleSendMessage] Response is not JSON, using as text');
-      assistantContent = responseText;
+      // Convert URLs to markdown links in plain text response
+      assistantContent = convertUrlsToMarkdownLinks(responseText);
     }
 
     setChats((prevChats) =>

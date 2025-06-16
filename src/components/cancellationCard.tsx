@@ -9,6 +9,14 @@ import { addAIMessageToChat } from '../utils/chatHelpers';
 import { authService } from '../services/api';
 import ReactDOM from 'react-dom';
 
+// Add function to get seat background color based on gender
+const getSeatBackgroundColor = (gender: string) => {
+  if (gender.toLowerCase() === 'female') {
+    return 'bg-pink-200 text-pink-900'; // Light pink for female
+  }
+  return 'bg-yellow-200 text-yellow-900'; // Light yellow for male
+};
+
 interface CancellationCardProps {
   data: UpcomingTravelsResponse;
   selectedChatId?: string;
@@ -54,11 +62,19 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
     setShowRefundPolicies(false)
     setSelectedRefundMethod('coins')
     
-    // If single ticket, select all seats by default, otherwise start with none
-    if (travel.policy.cancelSeatResponseDto.length === 1) {
-      setSelectedSeatsForCancellation(new Set(travel.policy.cancelSeatResponseDto.map(seat => seat.seatNumber)))
+    // Get active seats count
+    const activeSeats = travel.policy.cancelSeatResponseDto.filter(seat => seat.active).length;
+    
+    // If single active ticket, select it by default, otherwise start with none
+    if (activeSeats === 1) {
+      const singleSeat = travel.policy.cancelSeatResponseDto.find(seat => seat.active);
+      if (singleSeat) {
+        setSelectedSeatsForCancellation(new Set([singleSeat.seatNumber]));
+      } else {
+        setSelectedSeatsForCancellation(new Set());
+      }
     } else {
-      setSelectedSeatsForCancellation(new Set())
+      setSelectedSeatsForCancellation(new Set());
     }
   }
 
@@ -161,7 +177,7 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
     return date.toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: false
     })
   }
 
@@ -173,6 +189,17 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
     return `${hours}h ${minutes}m`
   }
+
+  const formatDateForMessage = (dateString: string) => {
+    const date = new Date(dateString);
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'short', // Mon, Tue, etc.
+      month: 'short',   // Jan, Feb, etc.
+      day: '2-digit',   // 01, 02, etc.
+      year: 'numeric'   // 2023, 2024, etc.
+    };
+    return date.toLocaleDateString('en-US', options);
+  };
 
   // Get the selected refund amount based on method choice
   const getSelectedRefundAmount = () => {
@@ -280,20 +307,21 @@ export default function CancellationCard({ data, selectedChatId, setChats }: Can
         refundAmountText = `₹${cashAmount.toFixed(2)}`;
       }
       
-      // Display AI message with a more customer-friendly format
-      const refundMethodText = selectedRefundMethod === 'coins' ? 'Green Coin Wallet' : 'original payment source';
-      const cancelledSeats = Array.from(selectedSeatsForCancellation).join(', ');
-      const aiMessage = `Dear customer,
+      // Construct the AI message with dynamic content based on the provided image format
+      const journeyDate = selectedTravel ? formatDateForMessage(selectedTravel.travel_details.date) : 'N/A';
+      const sourceName = selectedTravel?.travel_details.source.name || 'N/A';
+      const destinationName = selectedTravel?.travel_details.destination.name || 'N/A';
+      const pnr = selectedTravel ? `FRE${selectedTravel.travel_details.id}` : 'N/A';
+      const cancellationPolicyLink = "https://www.freshbus.com/privacy-policy";
 
-Your ticket has been successfully cancelled. Refund has been initiated as per our policy.
+      let refundSpecificText = '';
+      if (selectedRefundMethod === 'coins') {
+        refundSpecificText = `Your Green Coins have been instantly credited to your wallet. Thank you for your patience.`;
+      } else {
+        refundSpecificText = `The refund of ${refundAmountText} has been initiated. The refund will be credited in 7 days. Thank you for your patience.`;
+      }
 
-Cancelled seat(s): ${cancelledSeats}
-Amount credited: ${refundAmountText}
-Refund method: ${refundMethodText}
-
-${selectedRefundMethod === 'coins' ? 'Your Green Coins have been instantly credited to your wallet.' : 'The refund will be processed to your original payment method within 3-5 business days.'}
-
-Thank you for using our service.`;
+      const aiMessage = `Your Ticket Has Been Cancelled. Refund Initiated!\n\nDear Passenger,\n\nYou have opted to cancel your Freshbus ticket from ${sourceName} to ${destinationName} for journey date ${journeyDate} PNR: ${pnr}. This is to inform you that your booking is cancelled as per your request.\n\nThe Cancellation policy will be applied in this case [click here](${cancellationPolicyLink})\n\n${refundSpecificText}\n\nYou can now book a trip for your planned journey at another date & time.`;
       
       // Add AI message to chat if we have the required props
       if (selectedChatId && setChats) {
@@ -341,7 +369,7 @@ Thank you for using our service.`;
           return (
             <div
               key={travel.travel_details.id}
-              className="rounded-lg border p-2 text-white cursor-pointer hover:shadow-lg transition-shadow duration-200 shadow-sm"
+              className="rounded-lg  p-2 text-white cursor-pointer hover:shadow-lg transition-shadow duration-200 shadow-sm"
               style={{ background: 'linear-gradient(to bottom right, #0078d4, #005a9e)' }}
               onClick={() => handleTravelSelect(travel)}
             >
@@ -354,7 +382,7 @@ Thank you for using our service.`;
                   </div>
                   <div className="text-xs w-full">
                     <div className="font-bold">Seats:</div>
-                    <div className="mt-2 flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1">
                       {travel.policy.cancelSeatResponseDto.map((seat) => {
                         // Check if the seat is active
                         if (!seat.active) {
@@ -364,10 +392,10 @@ Thank you for using our service.`;
                         return (
                           <span
                             key={seat.seatNumber}
-                            className="rounded-md text-sm font-bold bg-yellow-300 text-black px-2 py-1 inline-flex items-center"
+                            className={`rounded-md text-sm font-bold px-2 py-1 inline-flex items-center ${getSeatBackgroundColor(seat.gender)}`}
                           >
                             <span>{seat.seatNumber}</span>
-                          </span>
+                          </span> 
                         );
                       })}
                     </div>
@@ -388,6 +416,10 @@ Thank you for using our service.`;
                     <div className="flex justify-center mt-1">
                       <p className="text-base sm:text-sm font-semibold text-[#fbe822]">{duration}</p>
                     </div>
+                  </div>
+
+                  <div className="flex p-1 rounded-lg mt-2 bg-[#fbe822]">
+                    <span className="text-xs text-[#0078d4] font-bold whitespace-nowrap">Ticket ID: FRE{travel.travel_details.id}</span>
                   </div>
                 </div>
                 <div className="w-1/3 flex flex-col">
@@ -471,7 +503,7 @@ Thank you for using our service.`;
                   }`}>
                     Select Seats for Cancellation
                   </h4>
-                  
+                   
                   <div className={`rounded-lg border shadow-sm ${
                     theme === 'dark' 
                       ? 'bg-gray-800 border-gray-700' 
@@ -491,9 +523,7 @@ Thank you for using our service.`;
                             className={`p-2 rounded-lg cursor-pointer transition-colors flex items-center gap-2 w-fit ${
                               selectedSeatsForCancellation.has(seat.seatNumber)
                                 ? "bg-red-500 text-white"
-                                : theme === 'dark'
-                                  ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                                  : "bg-gray-100 hover:bg-gray-200 text-gray-800"
+                                : getSeatBackgroundColor(seat.gender)
                             }`}
                           >
                             <div className="font-bold text-sm">{seat.seatNumber}</div>

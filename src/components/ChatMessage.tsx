@@ -241,6 +241,7 @@ export function ChatMessage({ message, onBook, selectedChatId, setChats }: ChatM
     parsedContent.trim() !== '' &&
     !parsedContent.trim().startsWith('{')
   ) {
+    console.log('[ChatMessage] Rendering defensive text:', parsedContent); 
     return (
       <div className="flex justify-start items-start py-1 mb-4 gap-1">
         <div className="flex-1 ml-2 text-left">
@@ -250,7 +251,18 @@ export function ChatMessage({ message, onBook, selectedChatId, setChats }: ChatM
             </span>
           </div>
           <div className="prose dark:prose-invert max-w-none mt-1 text-xs sm:text-sm">
-            <ReactMarkdown>{parsedContent}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[remarkBreaks]}
+              components={{
+                a: (props) => (
+                  <a {...props} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">
+                    {props.children}
+                  </a>
+                ),
+              }}
+            >
+              {parsedContent}
+            </ReactMarkdown>
           </div>
         </div>
       </div>
