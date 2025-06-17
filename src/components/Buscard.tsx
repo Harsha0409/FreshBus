@@ -41,6 +41,10 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   const [appliedGreenCoins, setAppliedGreenCoins] = useState(0);
   const [appliedFreshCard, setAppliedFreshCard] = useState(false);
   
+  // Fresh Card Purchase state
+  const [isPurchasingFreshCard, setIsPurchasingFreshCard] = useState(false);
+  const [freshCardPurchaseAmount] = useState(75); // Fixed amount for fresh card purchase
+  
   // Boarding and dropping points
   const [selectedBoarding, setSelectedBoarding] = useState<string | null>(
     (() => {
@@ -110,8 +114,48 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
   const categoryStyle = getCategoryStyle(bus.category);
   const originalFare = calculateCategoryFare(allSeats);
   
-  // Calculate final fare with discounts - FIXED VERSION
-  const calculateFinalFare = (): FinalFareCalculation => {
+  // Helper function to check if fresh card is available - UPDATED
+  const isFreshCardAvailable = (): boolean => {
+    return !!(freshCard && 
+             freshCard.available === true && 
+             typeof freshCard.balance === 'number' && 
+             freshCard.balance > 0);
+  };
+
+  // Helper function to get fresh card balance count - UPDATED
+  const getFreshCardBalance = (): number => {
+    if (freshCard && typeof freshCard.balance === 'number') {
+      return freshCard.balance;
+    }
+    return 0;
+  };
+
+  // Helper function to get current fresh card balance in rupees - UPDATED
+  const getCurrentFreshCardBalance = (): number => {
+    if (isPurchasingFreshCard) {
+      // If purchasing, start with 500 and subtract 50 if applied
+      return appliedFreshCard ? 450 : 500;
+    } else if (isFreshCardAvailable()) {
+      // If existing fresh card, calculate balance: balance * 50
+      // If applied, subtract 50 from the total
+      const totalBalance = getFreshCardBalance() * 50;
+      return appliedFreshCard ? totalBalance - 50 : totalBalance;
+    }
+    return 0;
+  };
+
+  // Helper function to get fresh card discount amount - UPDATED
+  const getFreshCardDiscountAmount = (): number => {
+    if (isPurchasingFreshCard && appliedFreshCard) {
+      return 50; // Fixed 50 discount when purchasing new fresh card
+    } else if (isFreshCardAvailable() && appliedFreshCard) {
+      return 50; // Each fresh card gives ₹50 discount
+    }
+    return 0;
+  };
+  
+  // Calculate final fare with discounts - UPDATED to include fresh card purchase
+  const calculateFinalFare = (): FinalFareCalculation & { freshCardPurchase?: number } => {
     let baseFare = originalFare.baseFare;
     let gst = originalFare.gst;
     let discount = originalFare.discount;
@@ -120,12 +164,24 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
     let baseTotal = baseFare + gst + discount;
     
     let actualGreenCoinsDiscount = 0;
-    let actualFreshCardDiscount = 0;
+    let actualFreshCardDiscount = getFreshCardDiscountAmount();
+    let freshCardPurchase = 0;
     let finalTotal = baseTotal; // Start with base total
 
+    // Add fresh card purchase amount if purchasing
+    if (isPurchasingFreshCard) {
+      freshCardPurchase = freshCardPurchaseAmount;
+      finalTotal += freshCardPurchase;
+      finalTotal -= actualFreshCardDiscount;
+      
+      // Now apply Green Coins to the remaining amount, rounded up
+      if (appliedGreenCoins > 0) {
+        actualGreenCoinsDiscount = Math.min(appliedGreenCoins, Math.ceil(finalTotal));
+        finalTotal -= actualGreenCoinsDiscount;
+      }
+    } 
     // Scenario 1: Fresh Card is applied (high priority)
-    if (appliedFreshCard && freshCard && freshCard.discountAmount > 0) {
-      actualFreshCardDiscount = Math.min(freshCard.discountAmount, baseTotal);
+    else if (appliedFreshCard && isFreshCardAvailable()) {
       finalTotal -= actualFreshCardDiscount;
       
       // Now apply Green Coins to the remaining amount, rounded up
@@ -151,6 +207,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       discount,
       greenCoinsDiscount: actualGreenCoinsDiscount,
       freshCardDiscount: actualFreshCardDiscount,
+      freshCardPurchase,
       total: finalTotal
     };
   };
@@ -188,7 +245,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
           setGreenCoins(busQueryResponse.green_coins);
         }
         
-        // Set fresh card data
+        // Set fresh card data - UPDATED to handle the correct structure
         if (busQueryResponse.freshcard) {
           console.log('Setting fresh card:', busQueryResponse.freshcard); // Debug log
           setFreshCard(busQueryResponse.freshcard);
@@ -243,7 +300,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
     }
   }, [selectedSeats]);
 
-  // Prepare passenger details when modal opens
+  // Prepare passenger details when modal opens - UPDATED
   useEffect(() => {
     if (isModalOpen && selectedSeats.length > 0) {
       // Reset passenger details based on seat count and gender
@@ -264,6 +321,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       // Reset discounts when modal opens (before re-applying them)
       setAppliedGreenCoins(0);
       setAppliedFreshCard(false);
+      setIsPurchasingFreshCard(false);
       
       // Automatically apply Green Coins if available
       if (greenCoins && greenCoins.available > 0) {
@@ -275,9 +333,10 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
         }
       }
 
-      // Automatically apply Fresh Card if available
-      if (freshCard && freshCard.available && freshCard.balance > 0) {
+      // Automatically apply Fresh Card if available - UPDATED logic
+      if (isFreshCardAvailable()) {
         setAppliedFreshCard(true);
+        console.log('Auto-applying fresh card:', freshCard);
       }
     }
   }, [isModalOpen, selectedSeats, bus, greenCoins, freshCard]);
@@ -322,19 +381,45 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
     toast.success(`₹${maxUsable} green coins will be applied!`);
   };
 
-  // Handle fresh card application
+  // Handle fresh card application - UPDATED
   const handleApplyFreshCard = () => {
-    if (!freshCard || !freshCard.available || freshCard.balance <= 0) {
-      toast.error('Fresh card not available or no balance remaining');
-      return;
-    }
-    
-    if (appliedFreshCard) {
-      setAppliedFreshCard(false);
-      toast.success('Fresh card discount removed');
+    if (isPurchasingFreshCard) {
+      // Handle toggle for purchased fresh card
+      if (appliedFreshCard) {
+        setAppliedFreshCard(false);
+        toast.success('Fresh card discount removed');
+      } else {
+        setAppliedFreshCard(true);
+        toast.success('₹50 fresh card discount will be applied!');
+      }
     } else {
-      setAppliedFreshCard(true);
-      toast.success(`Fresh card discount will be applied!`);
+      // Handle existing fresh card - UPDATED logic
+      if (!isFreshCardAvailable()) {
+        toast.error('Fresh card not available or no balance remaining');
+        return;
+      }
+      
+      if (appliedFreshCard) {
+        setAppliedFreshCard(false);
+        toast.success('Fresh card discount removed');
+      } else {
+        setAppliedFreshCard(true);
+        toast.success(`Fresh card discount will be applied!`);
+      }
+    }
+  };
+
+  // Handle fresh card purchase
+  const handlePurchaseFreshCard = () => {
+    if (isPurchasingFreshCard) {
+      setIsPurchasingFreshCard(false);
+      setAppliedFreshCard(false);
+      toast.success('Fresh card purchase cancelled');
+    } else {
+      setIsPurchasingFreshCard(true);
+      // Automatically remove existing fresh card application when purchasing new one
+      setAppliedFreshCard(true); // Auto-apply the discount
+      toast.success(`Fresh card will be purchased for ₹${freshCardPurchaseAmount} with ₹50 discount applied!`);
     }
   };
 
@@ -421,18 +506,27 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       
       console.log('Final fare calculation:', finalFare); // Debug log
       
-      // Use the updated createPaymentPayload function with final fare calculation
-      const payload = createPaymentPayload(
-        bus,
-        selectedSeats,
-        passengerDetails,
-        selectedBoarding,
-        selectedDropping,
-        appliedGreenCoins,
-        appliedFreshCard,
-        freshCard,
-        finalFare // Pass the calculated fare breakdown
-      );
+      // Create payload with fresh card purchase info
+      const payload = {
+        ...createPaymentPayload(
+          bus,
+          selectedSeats,
+          passengerDetails,
+          selectedBoarding,
+          selectedDropping,
+          appliedGreenCoins,
+          appliedFreshCard || isPurchasingFreshCard,
+          freshCard,
+          finalFare // Pass the calculated fare breakdown
+        ),
+        // Add fresh card purchase details
+        ...(isPurchasingFreshCard && {
+          purchase_fresh_card: true,
+          fresh_card_amount: freshCardPurchaseAmount,
+          fresh_card_discount_applied: appliedFreshCard ? 50 : 0,
+          fresh_card_remaining_balance: getCurrentFreshCardBalance()
+        })
+      };
       
       const response = await authService.fetchWithRefresh('/api/tickets/block', {
         method: 'POST',
@@ -453,10 +547,13 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
       
       // Handle the case where payment is confirmed using green coins
       if (data.success && !data.payment_url && !data.api_order_id) {
-        toast.success('Ticket booked successfully using green coins!');
+        if (isPurchasingFreshCard) {
+          toast.success('Ticket booked successfully and Fresh Card purchased!');
+        } else {
+          toast.success('Ticket booked successfully using green coins!');
+        }
         // Close the modal after successful booking
         handleModalClose();
-        // You can add additional logic here like redirecting to ticket details page
         return;
       }
 
@@ -966,6 +1063,12 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                     <strong>Discount:</strong>
                     <span>₹{finalFare.discount.toFixed(2)}</span>
                   </div>
+                  {(finalFare as any).freshCardPurchase > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <strong>FreshCard Purchase:</strong>
+                      <span>₹{(finalFare as any).freshCardPurchase.toFixed(2)}</span>
+                    </div>
+                  )}
                   {finalFare.greenCoinsDiscount > 0 && (
                     <div className="flex justify-between  text-xs">
                       <strong>Green Coins:</strong>
@@ -987,7 +1090,7 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                 </div>
               </div>
 
-              {/* Green Coins and Fresh Card Section */}
+              {/* Green Coins and Fresh Card Section - UPDATED */}
               <div className="flex items-stretch justify-between mt-2 space-x-3">
                 {/* Green Coins */}
                 <div className="flex flex-col justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-2 flex-1 min-h-[3rem]">
@@ -1032,30 +1135,39 @@ const BusCard: React.FC<BusCardProps> = ({ bus }) => {
                   </div>
                 </div>
 
-                {/* Fresh Card */}
+                {/* Fresh Card - UPDATED to properly handle backend data */}
                 <div className="flex flex-col justify-between bg-gray-50 dark:bg-gray-700 rounded-lg px-2 py-2 flex-1 min-h-[3rem]">
                   <div className="flex justify-between w-full">
                     <div className="text-gray-700 dark:text-gray-300 text-[10px] font-bold">
                       FRESH CARD
                     </div>
-                    <button 
-                      onClick={handleApplyFreshCard}
-                      disabled={!freshCard || !freshCard.available || freshCard.balance <= 0}
-                      className={`ml-auto text-[10px] px-2 py-1 rounded transition-colors font-medium ${
-                        appliedFreshCard 
-                          ? 'bg-red-400 hover:bg-red-500 text-white'
-                          : freshCard && freshCard.available && freshCard.balance > 0
-                            ? 'bg-yellow-400 hover:bg-yellow-500 text-gray-900'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                    >
-                      {appliedFreshCard ? 'Remove' : 'Apply'}
-                    </button>
+                    {/* Show different buttons based on fresh card availability - UPDATED */}
+                    {isFreshCardAvailable() || isPurchasingFreshCard ? (
+                      <button 
+                        onClick={handleApplyFreshCard}
+                        className={`ml-auto text-[10px] px-2 py-1 rounded transition-colors font-medium ${
+                          appliedFreshCard 
+                            ? 'bg-red-400 hover:bg-red-500 text-white'
+                            : 'bg-yellow-400 hover:bg-yellow-500 text-gray-900'
+                        }`}
+                      >
+                        {appliedFreshCard ? 'Remove' : 'Apply'}
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={handlePurchaseFreshCard}
+                        className="ml-auto text-[10px] px-2 py-1 rounded transition-colors font-medium bg-green-500 hover:bg-green-600 text-white"
+                      >
+                        Add
+                      </button>
+                    )}
                   </div>
                   <p className="text-[10px] text-gray-700 dark:text-gray-300 mt-1 w-full text-left">
-                    {freshCard 
-                      ? `Balance: ${freshCard.balance} | Save ₹${freshCard.discountAmount}`
-                      : 'Save ₹500 On Fresh Bus Rides'
+                    {isPurchasingFreshCard && appliedFreshCard
+                      ? `Available Balance: ₹${getCurrentFreshCardBalance()}`
+                      : isFreshCardAvailable() && appliedFreshCard
+                        ? `Available Balance: ₹${getCurrentFreshCardBalance()}`
+                        : 'Save ₹500 On Fresh Bus Rides'
                     }
                   </p>
                 </div>
